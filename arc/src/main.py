@@ -1,5 +1,6 @@
 import data
 import vis
+import model
 
 import matplotlib.pyplot as plt
 
