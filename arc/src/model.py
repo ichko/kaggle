@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+from tqdm.auto import tqdm
+
 device = 'cpu'
 
 
@@ -74,3 +76,33 @@ def predict(model, task):
         pred = model(x, 100).argmax(1).squeeze().cpu().numpy()
         predictions.append(pred)
     return predictions
+
+
+def train(model, dataloader, epochs):
+
+    for epoch in tqdm(range(epochs)):
+        tq = tqdm(dataloader)
+        for batch in tq:
+            loss = model.optim_step(batch)
+
+            tq.set_description(f'LOSS: {loss.item():.5f}')
+
+
+# https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
+# AVG TOP 3 for each task (less is better)
+def score(model, dataloader):
+    error = 0
+    for batch in dataloader:
+        # outputs 3 predictions per task
+        outputs = model(batch)
+
+        task_error = 1
+        for o in outputs:
+            if o.shape == batch['test_outputs'].shape and \
+                torch.all(o == batch['test_outputs']).item():
+                task_error = 0
+                break
+
+        error += task_error
+
+    return error / len(dataloader)
