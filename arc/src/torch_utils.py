@@ -7,10 +7,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class BaseModule(nn.Module):
+class Module(nn.Module):
     def __init__(self):
         super().__init__()
         self.name = 'Custom Module'
+        self.criterion = nn.MSELoss()
 
     def count_parameters(self):
         return count_parameters(self)
@@ -31,22 +32,99 @@ class BaseModule(nn.Module):
     def can_be_preloaded(self):
         return os.path.isfile(self.path)
 
-    def summary(self):
+    def configure_optim(self, lr):
+        self.optim = T.optim.Adam(self.parameters(), lr=lr)
+
+    def metrics(self, _loss, _info):
+        return {}
+
+    def optim_step(self, batch, optim_kw={}):
+        X, y = batch
+
+        y_pred = self.optim_forward(X)
+        loss = self.criterion(y_pred, y)
+
+        if loss.requires_grad:
+            if not hasattr(self, 'optim'):
+                self.configure_optim(**optim_kw)
+
+            self.optim.zero_grad()
+            loss.backward()
+            self.optim.step()
+
+        metrics = self.metrics(loss.item(), {
+            'X': X,
+            'y_pred': y_pred,
+            'y': y,
+        })
+
+        return loss.item(), {
+            'metrics': metrics,
+            'X': X,
+            'y_pred': y_pred,
+            'y': y,
+        }
+
+    def set_requires_grad(self, value):
+        for param in self.parameters():
+            param.requires_grad = value
+
+    def summary(self, input_size=-1):
+        try:
+            from torchsummary import summary
+            summary(self, input_size)
+            return
+        except Exception:
+            pass
+
         result = f' > {self.name[:38]:<38} | {count_parameters(self):09,}\n'
         for name, module in self.named_children():
             type = module._get_name()
             num_prams = count_parameters(module)
             result += f' >  {name[:20]:>20}: {type[:15]:<15} | {num_prams:9,}\n'
 
-        return result
+        print(result)
+
+    def optim_forward(self, X):
+        return self.forward(X)
 
     @property
     def device(self):
         return next(self.parameters()).device
 
 
+class DenseAE(Module):
+    def __init__(self, hid_size=2):
+        super().__init__()
+        self.hid_size = hid_size
+
+    def forward(self, x):
+        if not hasattr(self, 'encoder'):
+            dims = np.prod(list(x.shape[1:]))
+            self.encoder = nn.Sequential(
+                nn.Flatten(),
+                dense(dims, 128),
+                dense(128, 16),
+                dense(16, self.hid_size, a=None),
+            )
+
+            self.decoder = nn.Sequential(
+                dense(self.hid_size, 16),
+                dense(16, 128),
+                dense(128, np.prod(x.shape[1:]), a=nn.Sigmoid()),
+                Reshape(-1, *x.shape[1:]),
+            )
+
+            self.criterion = nn.BCELoss(reduction='mean')
+            self.to(x.device)
+
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+
 def get_activation():
-    LEAKY_SLOPE = 0.1
+    LEAKY_SLOPE = 0.2
     return nn.LeakyReLU(LEAKY_SLOPE, inplace=True)
 
 
@@ -103,20 +181,22 @@ def dense(i, o, a=get_activation()):
     return l if a is None else nn.Sequential(l, a)
 
 
-def reshape(*shape):
-    class Reshaper(nn.Module):
-        def forward(self, x):
-            return x.reshape(shape)
+class Reshape(nn.Module):
+    def __init__(self, *shape):
+        super().__init__()
+        self.shape = shape
 
-    return Reshaper()
+    def forward(self, x):
+        return x.reshape(self.shape)
 
 
-def lam(forward):
-    class Lambda(nn.Module):
-        def forward(self, *args):
-            return forward(*args)
+class Lambda(nn.Module):
+    def __init__(self, forward):
+        super().__init__()
+        self.forward = forward
 
-    return Lambda()
+    def forward(self, *args):
+        return self.forward(*args)
 
 
 def resize(t, size):
@@ -125,8 +205,10 @@ def resize(t, size):
 
 def conv_block(i, o, ks, s, p, a=get_activation(), d=1, bn=True):
     block = [nn.Conv2d(i, o, kernel_size=ks, stride=s, padding=p, dilation=d)]
-    if bn: block.append(nn.BatchNorm2d(o))
-    if a is not None: block.append(a)
+    if bn:
+        block.append(nn.BatchNorm2d(o))
+    if a is not None:
+        block.append(a)
 
     return nn.Sequential(*block)
 
@@ -143,8 +225,13 @@ def deconv_block(i, o, ks, s, p, a=get_activation(), d=1, bn=True):
         )
     ]
 
-    if bn: block.append(nn.BatchNorm2d(o))
-    if a is not None: block.append(a)
+    if bn:
+        block.append(nn.BatchNorm2d(o))
+    if a is not None:
+        block.append(a)
+
+    if len(block) == 1:
+        return block[0]
 
     return nn.Sequential(*block)
 
@@ -179,29 +266,66 @@ def conv_decoder(sizes, ks=4, s=2, a=get_activation()):
     return stack_conv_blocks(deconv_block, sizes, ks, a, s=s, p=ks // 2 - 1)
 
 
-def conv_to_flat(
-        input_size,
-        channel_sizes,
-        out_size,
-        ks=4,
-        s=2,
-        a=get_activation(),
-):
-    class ConvEncoder(nn.Module):
-        def __init__(self):
-            super().__init__()
+class FlatToConv(nn.Module):
+    def __init__(self, channel_size, ks, s, a, p):
+        super().__init__()
 
-            input_channels = channel_sizes[0]
-            self.encoder = conv_transform(channel_sizes, ks, s, a)
+        def process_arg(*args):
+            return [
+                a if type(a) is list else [a] * (len(channel_size) - 1)
+                for a in args
+            ]
+
+        ks, s, a, p = process_arg(ks, s, a, p)
+
+        layers = []
+        layers_io = list(zip(channel_size, channel_size[1:]))
+        for idx, ((i, o), ks, s, a,
+                  p) in enumerate(zip(layers_io, ks, s, a, p)):
+            bn = idx < len(layers_io) - 1
+            l = deconv_block(i=i, o=o, ks=ks, s=s, p=p, a=a, bn=bn)
+            layers.append(l)
+
+        self.net = nn.Sequential(Reshape(-1, channel_size[0], 1, 1), *layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class ConvToFlat(nn.Module):
+    def __init__(
+            self,
+            channel_sizes,
+            out_size,
+            ks=4,
+            s=2,
+            a=get_activation(),
+    ):
+        super().__init__()
+        self.channel_sizes = channel_sizes
+        self.out_size = out_size
+        self.ks = ks
+        self.s = s
+        self.a = a
+
+    def forward(self, x):
+        if not hasattr(self, 'net'):
+            input_size = x.shape[-2:]
+            input_channels = self.channel_sizes[0]
+            self.encoder = conv_transform(self.channel_sizes, self.ks, self.s,
+                                          self.a)
+
             self.encoder_out_shape = compute_output_shape(
                 self.encoder,
                 (input_channels, *input_size),
             )
+
             self.flat_encoder_out_size = np.prod(self.encoder_out_shape[-3:])
+
             self.encoded_to_flat = nn.Sequential(
                 nn.Flatten(),
-                a,
-                dense(self.flat_encoder_out_size, out_size),
+                self.a,
+                nn.Linear(self.flat_encoder_out_size, self.out_size),
             )
 
             self.net = nn.Sequential(
@@ -209,10 +333,9 @@ def conv_to_flat(
                 self.encoded_to_flat,
             )
 
-        def forward(self, x):
-            return self.net(x)
+            self.net.to(x.device)
 
-    return ConvEncoder()
+        return self.net(x)
 
 
 def compute_output_shape(net, frame_shape):
@@ -244,7 +367,7 @@ def spatial_transformer(i, num_channels, only_translations=False):
             self.num_channels = num_channels
             self.locator = nn.Sequential(
                 nn.Linear(i, num_channels * 2 * 3),
-                reshape(-1, 2, 3),
+                Reshape(-1, 2, 3),
             )
 
             self.device = self.locator[0].bias.device
@@ -307,10 +430,8 @@ def prepare_rnn_state(state, num_rnn_layers):
     """
     RNN cells expect the initial state
     in the shape -> [rnn_num_layers, bs, rnn_state_size]
-
     In this case rnn_state_size = state // rnn_num_layers.
     The state is distributed among the layers
-
     state          -> [bs, state_size]
     rnn_num_layers -> int
     """
@@ -324,12 +445,12 @@ def time_distribute(module, input=None):
     """
     Distribute execution of module over batched sequential input tensor.
     This is done in the batch dimension to facilitate parallel execution.
-
     input  -> [bs, seq, *x*]
     module -> something that takes *x*
     return -> [bs, seq, module(x)]
     """
-    if input is None: return time_distribute_decorator(module)
+    if input is None:
+        return time_distribute_decorator(module)
 
     shape = input[0].size() if type(input) is list else input.size()
     bs = shape[0]
@@ -444,6 +565,13 @@ class KernelEmbedding(nn.Module):
 
         return transformed_tensor
 
+
+# Extensions
+def to_np(t):
+    return t.detach().cpu().numpy()
+
+
+T.Tensor.np = property(lambda self: to_np(self))
 
 if __name__ == '__main__':
     # Sanity check mask_sequence
