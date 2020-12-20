@@ -120,10 +120,12 @@ def get_tasks_dl(tasks, bs, shuffle):
             except KeyError as _e:
                 test_outputs = test_inputs
 
-            return dict(train_inputs=train_inputs,
-                        train_outputs=train_outputs,
-                        test_inputs=test_inputs,
-                        test_outputs=test_outputs)
+            return dict(
+                train_inputs=train_inputs.astype(np.float32),
+                train_outputs=train_outputs.astype(np.float32),
+                test_inputs=test_inputs.astype(np.float32),
+                test_outputs=test_outputs.astype(np.float32),
+            )
 
     dl = td.DataLoader(Dataset(), batch_size=bs, shuffle=shuffle)
 
