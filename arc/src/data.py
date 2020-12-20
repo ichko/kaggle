@@ -47,12 +47,18 @@ def map_np(mapper, obj):
     return obj
 
 
+BORDER_IDENTIFIER = 10
+
+
 def normalize_matrix_size(matrix):
     matrix = np.pad(
         matrix,
         ((1, 1), (1, 1)),
         'constant',
-        constant_values=((10, 10), (10, 10)),
+        constant_values=(
+            (BORDER_IDENTIFIER, BORDER_IDENTIFIER),
+            (BORDER_IDENTIFIER, BORDER_IDENTIFIER),
+        ),
     )
     max_width = 32
     max_height = 32
@@ -66,6 +72,14 @@ def normalize_matrix_size(matrix):
     output[padding_y:padding_y + h, padding_x:padding_x + w] = matrix
 
     return output
+
+
+def one_hot_channels(inp, max_size):
+    inp = np.array(inp)
+    img = np.full((max_size, inp.shape[0], inp.shape[1]), 0, dtype=np.uint8)
+    for i in range(max_size):
+        img[i] = inp == i
+    return img
 
 
 def normalize_obj(obj):
@@ -84,14 +98,25 @@ def get_tasks_dl(tasks, bs, shuffle):
             return len(tasks)
 
         def __getitem__(self, idx):
-            train_inputs = np.array([t['input'] for t in tasks[idx]['train']])
-            train_outputs = np.array(
-                [t['output'] for t in tasks[idx]['train']])
-            test_inputs = np.array([t['input'] for t in tasks[idx]['test']])
+            num_semantic_ids = 11  # each color + one id for border
+            train_inputs = np.array([
+                one_hot_channels(t['input'], max_size=num_semantic_ids)
+                for t in tasks[idx]['train']
+            ], )
+            train_outputs = np.array([
+                one_hot_channels(t['output'], max_size=num_semantic_ids)
+                for t in tasks[idx]['train']
+            ])
+            test_inputs = np.array([
+                one_hot_channels(t['input'], max_size=num_semantic_ids)
+                for t in tasks[idx]['test']
+            ])
 
             try:
-                test_outputs = np.array(
-                    [t['output'] for t in tasks[idx]['test']])
+                test_outputs = np.array([
+                    one_hot_channels(t['output'], max_size=num_semantic_ids)
+                    for t in tasks[idx]['test']
+                ])
             except KeyError as _e:
                 test_outputs = test_inputs
 
