@@ -1,6 +1,6 @@
 import data
 import vis
-import model
+import models
 
 import matplotlib.pyplot as plt
 
@@ -15,13 +15,18 @@ if __name__ == '__main__':
 
     # vis.plot_sample(sample)
 
-    score = model.score(model=trivial_model,
-                        dataloader=data.TRAIN_DL(bs=1, shuffle=False))
+    score = models.score(model=trivial_model,
+                         dataloader=data.TRAIN_DL(bs=1, shuffle=False))
 
     print('SCORE', score)  # less is better
     dl = data.TRAIN_DL(bs=1, shuffle=False)
     it = iter(dl)
     batch = next(it)
     batch = next(it)
+
+    model = models.SoftAddressableComputationCNN(input_channels=11)
+
+    output = model(batch)
+    print(output)
 
     # model, num_steps, losses = model.solve_task(task)

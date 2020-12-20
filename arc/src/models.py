@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch_utils as tu
 
 from tqdm.auto import tqdm
 
@@ -22,12 +23,27 @@ class CAModel(nn.Module):
         return x
 
 
-def inp2img(inp):
-    inp = np.array(inp)
-    img = np.full((11, inp.shape[0], inp.shape[1]), 0, dtype=np.uint8)
-    for i in range(11):
-        img[i] = inp == i
-    return img
+class SoftAddressableComputationCNN(tu.BaseModule):
+    def __init__(self, input_channels):
+        super().__init__()
+
+        self.task_feature_extract = nn.Sequential(
+            nn.Conv2d(input_channels, 128, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
+            nn.Conv2d(128, 64, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
+            nn.Conv2d(128, 64, kernel_size=5, stride=2, padding=2),
+        )
+
+    def forward(self, batch):
+        train_inputs = batch['train_inputs']
+        train_outputs = batch['train_outputs']
+
+        task_features = self.task_feature_extract(x)
+
+        return task_features
 
 
 def solve_task(task, max_steps=10):
@@ -79,7 +95,6 @@ def predict(model, task):
 
 
 def train(model, dataloader, epochs):
-
     for epoch in tqdm(range(epochs)):
         tq = tqdm(dataloader)
         for batch in tq:
