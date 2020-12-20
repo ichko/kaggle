@@ -25,8 +25,9 @@ if __name__ == '__main__':
     batch = next(it)
 
     model = models.SoftAddressableComputationCNN(input_channels=11)
+    model.summary()
 
     output = model(batch)
-    print(output)
+    print(output.shape)
 
     # model, num_steps, losses = model.solve_task(task)

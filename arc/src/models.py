@@ -23,25 +23,36 @@ class CAModel(nn.Module):
         return x
 
 
-class SoftAddressableComputationCNN(tu.BaseModule):
+class SoftAddressableComputationCNN(tu.Module):
     def __init__(self, input_channels):
         super().__init__()
 
         self.task_feature_extract = nn.Sequential(
-            nn.Conv2d(input_channels, 128, kernel_size=5, stride=2, padding=2),
+            nn.Conv2d(input_channels * 2,
+                      128,
+                      kernel_size=5,
+                      stride=2,
+                      padding=2),
             nn.ReLU(),
             nn.Conv2d(128, 128, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
             nn.Conv2d(128, 64, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
-            nn.Conv2d(128, 64, kernel_size=5, stride=2, padding=2),
+            nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 32, kernel_size=2, stride=1, padding=0),
+            tu.Reshape(-1, 32),
         )
+        self.task_feature_extract = tu.time_distribute(
+            self.task_feature_extract)
 
     def forward(self, batch):
         train_inputs = batch['train_inputs']
         train_outputs = batch['train_outputs']
+        channel_dim = 2
+        train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
 
-        task_features = self.task_feature_extract(x)
+        task_features = self.task_feature_extract(train_io)
 
         return task_features
 
