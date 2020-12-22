@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 import numpy as np
 import torch_utils as tu
 
@@ -24,6 +26,8 @@ class CAModel(nn.Module):
 
 
 class HyperParams(nn.Module):
+    # TODO: something multihead would be nice!
+
     def __init__(self, shape):
         super().__init__()
         self.params = nn.Parameter(torch.rand(shape))
@@ -93,6 +97,8 @@ class SoftAddressableComputationCNN(tu.Module):
     def forward(self, batch):
         train_inputs = batch['train_inputs']
         train_outputs = batch['train_outputs']
+        test_inputs = batch['test_inputs']
+
         channel_dim = 2
         train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
 
@@ -100,7 +106,16 @@ class SoftAddressableComputationCNN(tu.Module):
         layer_1 = self.conv_params_1(task_features)
         layer_2 = self.conv_params_2(task_features)
 
-        return task_features
+        # TODO: This is temporary since we don't batch tasks
+        test_inputs = test_inputs.squeeze(0)
+        x = test_inputs
+        for i in range(10):
+            x = F.conv2d(x, layer_1, padding=2)
+            x = F.relu(x)
+            x = F.conv2d(x, layer_2, padding=2)
+            x = torch.softmax(x, dim=1)
+
+        return x.unsqueeze(0)
 
 
 def solve_task(task, max_steps=10):
