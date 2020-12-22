@@ -23,16 +23,52 @@ class CAModel(nn.Module):
         return x
 
 
+class HyperParams(nn.Module):
+    def __init__(self, shape):
+        super().__init__()
+        self.params = nn.Parameter(torch.rand(shape))
+        self.params.requires_grad = True
+
+    def forward(self, task_features):
+        # TODO: This is temporary workaround since tasks are not batched (batchdim = 1).
+        task_features = task_features.squeeze(0)
+
+        repeated_dims = [
+            task_features.shape[0], *([1] * len(self.params.shape))
+        ]
+        batched_conv_params = self.params.unsqueeze(0).repeat(*repeated_dims)
+        task_features = task_features.unsqueeze(2).unsqueeze(2).unsqueeze(
+            2).unsqueeze(2)
+        weighted_conv_params = task_features * batched_conv_params
+        conv_params_per_demonstration = torch.sum(
+            weighted_conv_params,
+            dim=1,
+        )
+
+        # TODO: This should be changed to something more expressive.
+        # Now we just avg across demonstrations.
+        avg_across_demonstrations = torch.mean(
+            conv_params_per_demonstration,
+            dim=0,
+        )
+
+        return avg_across_demonstrations
+
+
 class SoftAddressableComputationCNN(tu.Module):
     def __init__(self, input_channels):
         super().__init__()
 
+        num_hyper_kernels = 32
+
         self.task_feature_extract = nn.Sequential(
-            nn.Conv2d(input_channels * 2,
-                      128,
-                      kernel_size=5,
-                      stride=2,
-                      padding=2),
+            nn.Conv2d(
+                input_channels * 2,
+                128,
+                kernel_size=5,
+                stride=2,
+                padding=2,
+            ),
             nn.ReLU(),
             nn.Conv2d(128, 128, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
@@ -40,11 +76,19 @@ class SoftAddressableComputationCNN(tu.Module):
             nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
-            nn.Conv2d(64, 32, kernel_size=2, stride=1, padding=0),
-            tu.Reshape(-1, 32),
+            nn.Conv2d(64, 128, kernel_size=2, stride=1, padding=0),
+            nn.ReLU(),
+            tu.Reshape(-1, 128),
+            nn.Linear(128, num_hyper_kernels),
+            nn.Softmax(dim=1),
         )
         self.task_feature_extract = tu.time_distribute(
             self.task_feature_extract)
+
+        self.conv_params_1 = HyperParams(
+            (num_hyper_kernels, 128, input_channels, 5, 5))
+        self.conv_params_2 = HyperParams(
+            (num_hyper_kernels, input_channels, 128, 5, 5))
 
     def forward(self, batch):
         train_inputs = batch['train_inputs']
@@ -53,6 +97,8 @@ class SoftAddressableComputationCNN(tu.Module):
         train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
 
         task_features = self.task_feature_extract(train_io)
+        layer_1 = self.conv_params_1(task_features)
+        layer_2 = self.conv_params_2(task_features)
 
         return task_features
 
