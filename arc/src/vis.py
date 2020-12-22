@@ -18,7 +18,9 @@ def plot_pictures(pictures, labels):
     # fig, axs = plt.subplots(1, len(pictures), figsize=(2*len(pictures), 32))
     fig, axs = plt.subplots(1, len(pictures))
     for i, (pict, label) in enumerate(zip(pictures, labels)):
+
         axs[i].imshow(np.array(pict), cmap=cmap, norm=norm)
+        axs[i].grid(True,which='both',color='lightgrey', linewidth=0.5)
         axs[i].set_title(label)
     plt.show()
 
