@@ -124,23 +124,26 @@ def get_tasks_dl(tasks, bs, shuffle):
                 train_inputs=train_inputs.astype(np.float32),
                 train_outputs=train_outputs.astype(np.float32),
                 test_inputs=test_inputs.astype(np.float32),
-                test_outputs=test_outputs.astype(np.float32),
-            )
+            ), test_outputs.astype(np.float32),
 
     dl = td.DataLoader(Dataset(), batch_size=bs, shuffle=shuffle)
 
     return dl
 
 
-TRAIN = load_folder('.data/training')
-TRAIN = normalize_obj(TRAIN)
-train_vals = list(TRAIN.values())
-TRAIN_DL = lambda bs, shuffle: get_tasks_dl(train_vals, bs, shuffle)
+def load_data():
+    TRAIN = load_folder('.data/training')
+    TRAIN = normalize_obj(TRAIN)
+    train_vals = list(TRAIN.values())
+    TRAIN_DL = lambda bs, shuffle: get_tasks_dl(train_vals, bs, shuffle)
 
-VAL = load_folder('.data/evaluation')
-VAL = normalize_obj(VAL)
-val_vals = list(VAL.values())
-VAL_DL = lambda bs, shuffle: get_tasks_dl(val_vals, bs, shuffle)
+    VAL = load_folder('.data/evaluation')
+    VAL = normalize_obj(VAL)
+    val_vals = list(VAL.values())
+    VAL_DL = lambda bs, shuffle: get_tasks_dl(val_vals, bs, shuffle)
+
+    return TRAIN_DL, VAL_DL
+
 
 if __name__ == '__main__':
     print(len(TRAIN), len(VAL))
