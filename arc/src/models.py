@@ -56,7 +56,7 @@ class HyperParams(nn.Module):
         # Now we just avg across demonstrations.
         avg_across_demonstrations = torch.mean(
             conv_params_per_demonstration,
-            dim=0,
+            dim=1,
         )
 
         return avg_across_demonstrations
@@ -110,17 +110,15 @@ class SoftAddressableComputationCNN(tu.Module):
         layer_2 = self.conv_params_2(task_features)
 
         # TODO: This assumes only single test pair
-        # TODO: APPLY GROPED conv2d
-        # <https://discuss.pytorch.org/t/how-to-apply-different-kernels-to-each-example-in-a-batch-when-using-convolution/84848/4>
         test_inputs = test_inputs[:, 0]
         x = test_inputs
         for i in range(10):
-            x = F.conv2d(x, layer_1, padding=2, groups=?)
+            x = tu.batch_conv(x, layer_1, p=2)
             x = F.relu(x)
-            x = F.conv2d(x, layer_2, padding=2, groups=?)
+            x = tu.batch_conv(x, layer_2, p=2)
             x = torch.softmax(x, dim=1)
 
-        return x.unsqueeze(0)
+        return x.unsqueeze(1)
 
 
 def solve_task(task, max_steps=10):
