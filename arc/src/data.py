@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+import utils
 
 
 def matrix_to_np(obj):
@@ -21,7 +22,12 @@ def matrix_to_np(obj):
 def load_folder(path):
     result = dict()
 
-    for file_name in os.listdir(path):
+    file_names = os.listdir(path)
+    if utils.IS_DEBUG:
+        # load only 10 files in debug mode
+        file_names = file_names[:10]
+
+    for file_name in file_names:
         file_path = os.path.join(path, file_name)
         with open(file_path, 'r') as f:
             text = f.read()
