@@ -177,17 +177,16 @@ def train(model, dataloader, epochs):
 
 # https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
 # AVG TOP 3 for each task (less is better)
-def score(model, dataloader):
+def evaluate(model, dataloader):
     error = 0
-    for X, y in dataloader:
-        # outputs 3 predictions per task
-        outputs = model(X)
+    for X, y in tqdm(dataloader):
+        # Currently outputting single prediction per test input
+        y_hat = model(X)
+        y_hat = (y_hat > 0.5).float()
 
         task_error = 1
-        for o in outputs:
-            if o.shape == y.shape and torch.all(o == y).item():
-                task_error = 0
-                break
+        if y_hat.shape == y.shape and torch.all(y_hat == y).item():
+            task_error = 0
 
         error += task_error
 

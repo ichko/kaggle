@@ -5,11 +5,6 @@ import torch
 
 import matplotlib.pyplot as plt
 
-
-def trivial_model(batch):
-    return [batch['test_inputs']] * 3
-
-
 if __name__ == '__main__':
     TRAIN, VAL = data.load_data()
 
@@ -18,12 +13,6 @@ if __name__ == '__main__':
 
     # vis.plot_sample(sample)
 
-    score = models.score(
-        model=trivial_model,
-        dataloader=TRAIN(bs=1, shuffle=False),
-    )
-
-    print('SCORE', score)  # less is better
     dl = TRAIN(bs=1, shuffle=False)
     it = iter(dl)
     batch = next(it)
@@ -31,6 +20,12 @@ if __name__ == '__main__':
 
     model = models.SoftAddressableComputationCNN(input_channels=11)
     model.summary()
+
+    score = models.evaluate(
+        model=model,
+        dataloader=TRAIN(bs=1, shuffle=False),
+    )
+    print('SCORE', score)  # less is better
 
     output = model(X)
     print(output.shape)
@@ -48,8 +43,8 @@ if __name__ == '__main__':
 
     model = torch.load(f'{saved_model_path}_whole.h5')
 
-    train_score = models.score(model, TRAIN(bs=1, shuffle=False))
-    val_score = models.score(model, VAL(bs=1, shuffle=False))
+    train_score = models.evaluate(model, TRAIN(bs=1, shuffle=False))
+    val_score = models.evaluate(model, VAL(bs=1, shuffle=False))
 
     print('FINAL TRAIN SCORE:', train_score)
     print('FINAL VAL SCORE:', val_score)
