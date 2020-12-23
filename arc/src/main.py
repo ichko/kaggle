@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     # vis.plot_sample(sample)
 
-    dl = TRAIN(bs=1, shuffle=False)
+    dl = TRAIN(bs=3, shuffle=False)
     it = iter(dl)
     batch = next(it)
     X, y = next(it)

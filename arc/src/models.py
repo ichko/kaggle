@@ -26,17 +26,14 @@ class CAModel(nn.Module):
 
 
 class HyperParams(nn.Module):
-    # TODO: something multihead would be nice!
+    # TODO: something multiheaded would be nice!
 
     def __init__(self, shape):
         super().__init__()
-        self.params = nn.Parameter(torch.rand(shape))
+        self.params = nn.Parameter(torch.randn(shape))
         self.params.requires_grad = True
 
-    def forward(self, task_features):
-        # TODO: This is temporary workaround since tasks are not batched (batchdim = 1).
-        task_features = task_features.squeeze(0)
-
+    def forward_single_task(self, task_features):
         repeated_dims = [
             task_features.shape[0], *([1] * len(self.params.shape))
         ]
@@ -48,6 +45,12 @@ class HyperParams(nn.Module):
             weighted_conv_params,
             dim=1,
         )
+
+        return conv_params_per_demonstration
+
+    def forward(self, task_features):
+        conv_params_per_demonstration = tu.time_distribute(
+            self.forward_single_task, task_features)
 
         # TODO: This should be changed to something more expressive.
         # Now we just avg across demonstrations.
@@ -106,13 +109,15 @@ class SoftAddressableComputationCNN(tu.Module):
         layer_1 = self.conv_params_1(task_features)
         layer_2 = self.conv_params_2(task_features)
 
-        # TODO: This is temporary since we don't batch tasks
-        test_inputs = test_inputs.squeeze(0)
+        # TODO: This assumes only single test pair
+        # TODO: APPLY GROPED conv2d
+        # <https://discuss.pytorch.org/t/how-to-apply-different-kernels-to-each-example-in-a-batch-when-using-convolution/84848/4>
+        test_inputs = test_inputs[:, 0]
         x = test_inputs
         for i in range(10):
-            x = F.conv2d(x, layer_1, padding=2)
+            x = F.conv2d(x, layer_1, padding=2, groups=?)
             x = F.relu(x)
-            x = F.conv2d(x, layer_2, padding=2)
+            x = F.conv2d(x, layer_2, padding=2, groups=?)
             x = torch.softmax(x, dim=1)
 
         return x.unsqueeze(0)
