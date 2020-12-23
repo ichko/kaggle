@@ -467,33 +467,34 @@ def time_distribute(module, input=None):
     return out
 
 
+class TimeDistributed(nn.Module):
+    def __init__(self, module):
+        # IMPORTANT:
+        #   This init has to be here so that the
+        #   passed module parameters can be part of the
+        #   state (parameters) of the overall model.
+
+        super().__init__()
+        self.module = module
+
+    def forward(self, input):
+        shape = input[0].size() if type(input) is list else input.size()
+        bs = shape[0]
+        seq_len = shape[1]
+
+        if type(input) is list:
+            input = [i.reshape(-1, *i.shape[2:]) for i in input]
+        else:
+            input = input.reshape(-1, *shape[2:])
+
+        out = self.module(input)
+        out = out.view(bs, seq_len, *out.shape[1:])
+
+        return out
+
+
 def time_distribute_decorator(module):
-    class TimeDistributed(nn.Module):
-        def __init__(self):
-            # IMPORTANT:
-            #   This init has to be here so that the
-            #   passed module parameters can be part of the
-            #   state (parameters) of the overall model.
-
-            super().__init__()
-            self.module = module
-
-        def forward(self, input):
-            shape = input[0].size() if type(input) is list else input.size()
-            bs = shape[0]
-            seq_len = shape[1]
-
-            if type(input) is list:
-                input = [i.reshape(-1, *i.shape[2:]) for i in input]
-            else:
-                input = input.reshape(-1, *shape[2:])
-
-            out = module(input)
-            out = out.view(bs, seq_len, *out.shape[1:])
-
-            return out
-
-    return TimeDistributed()
+    return TimeDistributed(module)
 
 
 def time_distribute_13D(module):

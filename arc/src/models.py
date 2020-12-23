@@ -170,23 +170,22 @@ def train(model, dataloader, epochs):
     for epoch in tqdm(range(epochs)):
         tq = tqdm(dataloader)
         for batch in tq:
-            loss = model.optim_step(batch)
+            loss, info = model.optim_step(batch)
 
-            tq.set_description(f'LOSS: {loss.item():.5f}')
+            tq.set_description(f'LOSS: {loss:.5f}')
 
 
 # https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
 # AVG TOP 3 for each task (less is better)
 def score(model, dataloader):
     error = 0
-    for batch in dataloader:
+    for X, y in dataloader:
         # outputs 3 predictions per task
-        outputs = model(batch)
+        outputs = model(X)
 
         task_error = 1
         for o in outputs:
-            if o.shape == batch['test_outputs'].shape and \
-                torch.all(o == batch['test_outputs']).item():
+            if o.shape == y.shape and torch.all(o == y).item():
                 task_error = 0
                 break
 
