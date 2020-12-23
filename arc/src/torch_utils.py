@@ -2,9 +2,11 @@ import os
 
 import numpy as np
 
-import torch as T
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class Module(nn.Module):
@@ -20,20 +22,20 @@ class Module(nn.Module):
         self.path = path
 
     def persist(self):
-        T.save(self.state_dict(), self.path)
+        torch.save(self.state_dict(), self.path)
 
     def preload_weights(self):
-        self.load_state_dict(T.load(self.path))
+        self.load_state_dict(torch.load(self.path))
 
     def save(self, path=None):
         path = path if self.path is None else path
-        T.save(self, f'{self.path}_whole.h5')
+        torch.save(self, f'{self.path}_whole.h5')
 
     def can_be_preloaded(self):
         return os.path.isfile(self.path)
 
     def configure_optim(self, lr):
-        self.optim = T.optim.Adam(self.parameters(), lr=lr)
+        self.optim = torch.optim.Adam(self.parameters(), lr=lr)
 
     def metrics(self, _loss, _info):
         return {}
@@ -131,8 +133,8 @@ def get_activation():
 def one_hot(t, one_hot_size=None):
     one_hot_size = t.max() + 1 if one_hot_size is None else one_hot_size
 
-    hot = T.zeros((t.size(0), one_hot_size))
-    hot[T.arange(t.size(0)), t] = 1
+    hot = torch.zeros((t.size(0), one_hot_size))
+    hot[torch.arange(t.size(0)), t] = 1
     return hot
 
 
@@ -158,7 +160,7 @@ def count_parameters(module):
 
 
 def batch_conv(x, w, p=0, s=1):
-    # SRC - https://discuss.pyT.org/t/apply-different-convolutions-to-a-batch-of-tensors/56901/2
+    # SRC - https://discuss.pytorch.org/t/apply-different-convolutions-to-a-batch-of-tensors/56901/2
 
     batch_size = x.size(0)
     output_size = w.size(1)
@@ -339,8 +341,8 @@ class ConvToFlat(nn.Module):
 
 
 def compute_output_shape(net, frame_shape):
-    with T.no_grad():
-        t = T.rand(1, *frame_shape)
+    with torch.no_grad():
+        t = torch.rand(1, *frame_shape)
         out = net(t)
 
         return out.shape
@@ -374,9 +376,9 @@ def spatial_transformer(i, num_channels, only_translations=False):
             # Taken from the pytorch spatial transformer tutorial.
             self.locator[0].weight.data.zero_()
             self.locator[0].bias.data.copy_(
-                T.tensor(
+                torch.tensor(
                     [1, 0, 0, 0, 1, 0] * num_channels,
-                    dtype=T.float,
+                    dtype=torch.float,
                 ).to(self.device))
 
         def forward(self, x):
@@ -386,9 +388,9 @@ def spatial_transformer(i, num_channels, only_translations=False):
             _, C, H, W, = tensor_3d.shape
 
             if only_translations:
-                theta[:, :, :-1] = T.tensor(
+                theta[:, :, :-1] = torch.tensor(
                     [[1, 0], [0, 1]],
-                    dtype=T.float,
+                    dtype=torch.float,
                 ).to(self.device).unsqueeze_(0)
 
             grid = F.affine_grid(
@@ -413,14 +415,14 @@ def spatial_transformer(i, num_channels, only_translations=False):
     return SpatialTransformer()
 
 
-@T.jit.script
+@torch.jit.script
 def mask_sequence(tensor, mask):
     initial_shape = tensor.shape
     bs, seq = mask.shape
-    masked = T.where(
+    masked = torch.where(
         mask.reshape(bs * seq, -1),
         tensor.reshape(bs * seq, -1),
-        T.tensor(0, dtype=T.float32).to(tensor.device),
+        torch.tensor(0, dtype=torch.float32).to(tensor.device),
     )
 
     return masked.reshape(initial_shape)
@@ -435,8 +437,8 @@ def prepare_rnn_state(state, num_rnn_layers):
     state          -> [bs, state_size]
     rnn_num_layers -> int
     """
-    return T.stack(
-        state.chunk(T.tensor(num_rnn_layers), dim=1),
+    return torch.stack(
+        state.chunk(torch.tensor(num_rnn_layers), dim=1),
         dim=0,
     )
 
@@ -511,7 +513,7 @@ def time_distribute_13D(module):
                 out.size(3),
             )
 
-    return T.jit.script(TimeDistributed())
+    return torch.jit.script(TimeDistributed())
 
 
 def time_distribute_31D(module):
@@ -522,7 +524,7 @@ def time_distribute_31D(module):
             out = module(input)
             return out.reshape(bs, seq_len, out.size(1))
 
-    return T.jit.script(TimeDistributed())
+    return torch.jit.script(TimeDistributed())
 
 
 class KernelEmbedding(nn.Module):
@@ -572,12 +574,12 @@ def to_np(t):
     return t.detach().cpu().numpy()
 
 
-T.Tensor.np = property(lambda self: to_np(self))
+torch.Tensor.np = property(lambda self: to_np(self))
 
 if __name__ == '__main__':
     # Sanity check mask_sequence
-    tensor = T.rand(2, 3, 4)
-    mask = T.rand(2, 3) > 0.5
+    tensor = torch.rand(2, 3, 4)
+    mask = torch.rand(2, 3) > 0.5
     masked = mask_sequence(tensor, mask)
     print(mask)
     print(masked)
