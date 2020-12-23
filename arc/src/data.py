@@ -3,6 +3,10 @@ import json
 import numpy as np
 import utils
 
+import torch
+import torch.utils.data as td
+from torch.nn.utils.rnn import pad_sequence
+
 
 def matrix_to_np(obj):
     obj = obj.copy()
@@ -92,12 +96,19 @@ def normalize_obj(obj):
     return map_np(normalize_matrix_size, obj)
 
 
-def get_tasks_dl(tasks, bs, shuffle):
-    # Wont work with bs != 1 because different task have
-    # different number of examples
-    assert bs == 1, "bs, wont work for values != 1"
+def pad_in_dim(tensor, pad_size, dim, val=0):
+    shape = list(tensor.shape)
+    shape[dim] = pad_size - shape[dim]
+    padding = np.full(shape, val)
+    out = np.concatenate([tensor, padding], axis=dim)
 
-    import torch.utils.data as td
+    return out
+
+
+def get_tasks_dl(tasks, bs, shuffle):
+    # demonstrations are padded to this
+    max_demonstrations = 8
+    max_test_pairs = 1
 
     class Dataset(td.Dataset):
         def __len__(self):
@@ -107,32 +118,55 @@ def get_tasks_dl(tasks, bs, shuffle):
             num_semantic_ids = 11  # each color + one id for border
             train_inputs = np.array([
                 one_hot_channels(t['input'], max_size=num_semantic_ids)
-                for t in tasks[idx]['train']
+                for t in tasks[idx]['train'][:max_demonstrations]
             ], )
             train_outputs = np.array([
                 one_hot_channels(t['output'], max_size=num_semantic_ids)
-                for t in tasks[idx]['train']
+                for t in tasks[idx]['train'][:max_demonstrations]
             ])
             test_inputs = np.array([
                 one_hot_channels(t['input'], max_size=num_semantic_ids)
-                for t in tasks[idx]['test']
+                for t in tasks[idx]['test'][:max_test_pairs]
             ])
 
             try:
                 test_outputs = np.array([
                     one_hot_channels(t['output'], max_size=num_semantic_ids)
-                    for t in tasks[idx]['test']
+                    for t in tasks[idx]['test'][:max_test_pairs]
                 ])
             except KeyError as _e:
                 test_outputs = test_inputs
 
+            seq_dim = 0
+            train_len = len(train_inputs)
+            test_len = len(test_inputs)
+
+            train_inputs = pad_in_dim(train_inputs,
+                                      pad_size=max_demonstrations,
+                                      dim=seq_dim)
+            train_outputs = pad_in_dim(train_outputs,
+                                       pad_size=max_demonstrations,
+                                       dim=seq_dim)
+            test_inputs = pad_in_dim(test_inputs,
+                                     pad_size=max_test_pairs,
+                                     dim=seq_dim)
+            test_outputs = pad_in_dim(test_outputs,
+                                      pad_size=max_test_pairs,
+                                      dim=seq_dim)
+
             return dict(
+                train_len=train_len,
+                test_len=test_len,
                 train_inputs=train_inputs.astype(np.float32),
                 train_outputs=train_outputs.astype(np.float32),
                 test_inputs=test_inputs.astype(np.float32),
             ), test_outputs.astype(np.float32),
 
-    dl = td.DataLoader(Dataset(), batch_size=bs, shuffle=shuffle)
+    dl = td.DataLoader(
+        Dataset(),
+        batch_size=bs,
+        shuffle=shuffle,
+    )
 
     return dl
 
@@ -149,9 +183,3 @@ def load_data():
     VAL_DL = lambda bs, shuffle: get_tasks_dl(val_vals, bs, shuffle)
 
     return TRAIN_DL, VAL_DL
-
-
-if __name__ == '__main__':
-    print(len(TRAIN), len(VAL))
-
-    print(TRAIN[0]['train'][0]['input'].shape)
