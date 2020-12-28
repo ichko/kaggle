@@ -29,7 +29,7 @@ def load_folder(path):
     file_names = os.listdir(path)
     if utils.IS_DEBUG:
         # load only 10 files in debug mode
-        file_names = file_names[:10]
+        file_names = file_names[:32]
 
     for file_name in file_names:
         file_path = os.path.join(path, file_name)
@@ -43,24 +43,23 @@ def load_folder(path):
     return result
 
 
-def map_np(mapper, obj):
-    if type(obj) is np.ndarray:
-        return mapper(obj)
+def one_hot_channels(inp, max_size):
+    inp = np.array(inp)
+    img = np.full(
+        (inp.shape[0], max_size, inp.shape[1], inp.shape[2]),
+        0,
+        dtype=np.uint8,
+    )
 
-    iterator = obj.items() \
-        if type(obj) is dict \
-        else enumerate(obj)
+    for i in range(max_size):
+        img[:, i] = inp == i
 
-    for k, v in iterator:
-        obj[k] = map_np(mapper, v)
-
-    return obj
-
-
-BORDER_IDENTIFIER = 10
+    return img
 
 
 def normalize_matrix_size(matrix):
+    BORDER_IDENTIFIER = 10
+
     matrix = np.pad(
         matrix,
         ((1, 1), (1, 1)),
@@ -84,15 +83,20 @@ def normalize_matrix_size(matrix):
     return output
 
 
-def one_hot_channels(inp, max_size):
-    inp = np.array(inp)
-    img = np.full((max_size, inp.shape[0], inp.shape[1]), 0, dtype=np.uint8)
-    for i in range(max_size):
-        img[i] = inp == i
-    return img
-
-
 def normalize_obj(obj):
+    def map_np(mapper, obj):
+        if type(obj) is np.ndarray:
+            return mapper(obj)
+
+        iterator = obj.items() \
+            if type(obj) is dict \
+            else enumerate(obj)
+
+        for k, v in iterator:
+            obj[k] = map_np(mapper, v)
+
+        return obj
+
     return map_np(normalize_matrix_size, obj)
 
 
@@ -105,62 +109,45 @@ def pad_in_dim(tensor, pad_size, dim, val=0):
     return out
 
 
-def get_tasks_dl(tasks, bs, shuffle):
-    # demonstrations are padded to this
-    max_demonstrations = 8
+def load_data(path, bs, shuffle, device='cpu'):
+    data = load_folder(path)
+    data = normalize_obj(data)
+    tasks = list(data.values())
+
+    max_train_pairs = 8  # demonstrations are padded to this
     max_test_pairs = 1
+    num_colors = 11  # each color + one id for border
+    seq_dim = 0
+
+    def get(selectors, idx, max_pairs):
+        train_test, io = selectors
+        data = [t[io] for t in tasks[idx][train_test]]
+        data = data[:max_pairs]
+        data = one_hot_channels(data, max_size=num_colors)
+        data_len = len(data)
+        data = pad_in_dim(data, pad_size=max_train_pairs, dim=seq_dim)
+        data = data.astype(np.float32)
+        data = torch.Tensor(data).to(device)
+
+        return data, data_len
 
     class Dataset(td.Dataset):
         def __len__(self):
             return len(tasks)
 
-        def __getitem__(self, idx):
-            num_semantic_ids = 11  # each color + one id for border
-            train_inputs = np.array([
-                one_hot_channels(t['input'], max_size=num_semantic_ids)
-                for t in tasks[idx]['train'][:max_demonstrations]
-            ], )
-            train_outputs = np.array([
-                one_hot_channels(t['output'], max_size=num_semantic_ids)
-                for t in tasks[idx]['train'][:max_demonstrations]
-            ])
-            test_inputs = np.array([
-                one_hot_channels(t['input'], max_size=num_semantic_ids)
-                for t in tasks[idx]['test'][:max_test_pairs]
-            ])
-
-            try:
-                test_outputs = np.array([
-                    one_hot_channels(t['output'], max_size=num_semantic_ids)
-                    for t in tasks[idx]['test'][:max_test_pairs]
-                ])
-            except KeyError as _e:
-                test_outputs = test_inputs
-
-            seq_dim = 0
-            train_len = len(train_inputs)
-            test_len = len(test_inputs)
-
-            train_inputs = pad_in_dim(train_inputs,
-                                      pad_size=max_demonstrations,
-                                      dim=seq_dim)
-            train_outputs = pad_in_dim(train_outputs,
-                                       pad_size=max_demonstrations,
-                                       dim=seq_dim)
-            test_inputs = pad_in_dim(test_inputs,
-                                     pad_size=max_test_pairs,
-                                     dim=seq_dim)
-            test_outputs = pad_in_dim(test_outputs,
-                                      pad_size=max_test_pairs,
-                                      dim=seq_dim)
+        def __getitem__(self, id):
+            train_in, train_len = get(['train', 'input'], id, max_train_pairs)
+            train_out, _ = get(['train', 'output'], id, max_train_pairs)
+            test_in, test_len = get(['test', 'input'], id, max_test_pairs)
+            test_out, _ = get(['test', 'output'], id, max_test_pairs)
 
             return dict(
                 train_len=train_len,
                 test_len=test_len,
-                train_inputs=train_inputs.astype(np.float32),
-                train_outputs=train_outputs.astype(np.float32),
-                test_inputs=test_inputs.astype(np.float32),
-            ), test_outputs.astype(np.float32),
+                train_inputs=train_in,
+                train_outputs=train_out,
+                test_inputs=test_in,
+            ), test_out,
 
     dl = td.DataLoader(
         Dataset(),
@@ -169,17 +156,3 @@ def get_tasks_dl(tasks, bs, shuffle):
     )
 
     return dl
-
-
-def load_data():
-    TRAIN = load_folder('.data/training')
-    TRAIN = normalize_obj(TRAIN)
-    train_vals = list(TRAIN.values())
-    TRAIN_DL = lambda bs, shuffle: get_tasks_dl(train_vals, bs, shuffle)
-
-    VAL = load_folder('.data/evaluation')
-    VAL = normalize_obj(VAL)
-    val_vals = list(VAL.values())
-    VAL_DL = lambda bs, shuffle: get_tasks_dl(val_vals, bs, shuffle)
-
-    return TRAIN_DL, VAL_DL
