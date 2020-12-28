@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
-import torch_utils as tu
+import nn_utils as ut
 
 from tqdm.auto import tqdm
 
@@ -38,8 +38,10 @@ class HyperParams(nn.Module):
             task_features.shape[0], *([1] * len(self.params.shape))
         ]
         batched_conv_params = self.params.unsqueeze(0).repeat(*repeated_dims)
+
         task_features = task_features.unsqueeze(2).unsqueeze(2).unsqueeze(
             2).unsqueeze(2)
+
         weighted_conv_params = task_features * batched_conv_params
         conv_params_per_demonstration = torch.sum(
             weighted_conv_params,
@@ -49,7 +51,7 @@ class HyperParams(nn.Module):
         return conv_params_per_demonstration
 
     def forward(self, task_features):
-        conv_params_per_demonstration = tu.time_distribute(
+        conv_params_per_demonstration = ut.time_distribute(
             self.forward_single_task, task_features)
 
         # TODO: This should be changed to something more expressive.
@@ -62,7 +64,7 @@ class HyperParams(nn.Module):
         return avg_across_demonstrations
 
 
-class SoftAddressableComputationCNN(tu.Module):
+class SoftAddressableComputationCNN(ut.Module):
     def __init__(self, input_channels):
         super().__init__()
 
@@ -85,11 +87,11 @@ class SoftAddressableComputationCNN(tu.Module):
             nn.ReLU(),
             nn.Conv2d(64, 128, kernel_size=2, stride=1, padding=0),
             nn.ReLU(),
-            tu.Reshape(-1, 128),
+            ut.Reshape(-1, 128),
             nn.Linear(128, num_hyper_kernels),
             nn.Softmax(dim=1),
         )
-        self.task_feature_extract = tu.time_distribute(
+        self.task_feature_extract = ut.time_distribute(
             self.task_feature_extract)
 
         self.conv_params_1 = HyperParams(
@@ -113,9 +115,9 @@ class SoftAddressableComputationCNN(tu.Module):
         test_inputs = test_inputs[:, 0]
         x = test_inputs
         for i in range(10):
-            x = tu.batch_conv(x, layer_1, p=2)
+            x = ut.batch_conv(x, layer_1, p=2)
             x = F.relu(x)
-            x = tu.batch_conv(x, layer_2, p=2)
+            x = ut.batch_conv(x, layer_2, p=2)
             x = torch.softmax(x, dim=1)
 
         return x.unsqueeze(1)
