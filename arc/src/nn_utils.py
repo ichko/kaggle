@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
 
 class Module(nn.Module):
     def __init__(self):
@@ -452,7 +450,7 @@ def time_distribute(module, input=None):
     return -> [bs, seq, module(x)]
     """
     if input is None:
-        return time_distribute_decorator(module)
+        return TimeDistributed(module)
 
     shape = input[0].size() if type(input) is list else input.size()
     bs = shape[0]
@@ -493,80 +491,6 @@ class TimeDistributed(nn.Module):
         out = out.view(bs, seq_len, *out.shape[1:])
 
         return out
-
-
-def time_distribute_decorator(module):
-    return TimeDistributed(module)
-
-
-def time_distribute_13D(module):
-    class TimeDistributed(nn.Module):
-        def forward(self, input):
-            bs, seq_len, s = [input.size(i) for i in range(3)]
-            input = input.reshape(-1, s)
-            out = module(input)
-            return out.reshape(
-                bs,
-                seq_len,
-                out.size(1),
-                out.size(2),
-                out.size(3),
-            )
-
-    return torch.jit.script(TimeDistributed())
-
-
-def time_distribute_31D(module):
-    class TimeDistributed(nn.Module):
-        def forward(self, input):
-            bs, seq_len, c, h, w = [input.size(i) for i in range(5)]
-            input = input.reshape(-1, c, h, w)
-            out = module(input)
-            return out.reshape(bs, seq_len, out.size(1))
-
-    return torch.jit.script(TimeDistributed())
-
-
-class KernelEmbedding(nn.Module):
-    # kernel_sizes - (in, out, ks)[]
-    def __init__(self, num_embeddings, ks, channels, a=get_activation()):
-        super().__init__()
-
-        self.activation = a
-        self.kernel_shapes = [[o, i, ks, ks]
-                              for i, o in zip(channels, channels[1:])]
-
-        # self.batch_norms = nn.Sequential(
-        #     *[nn.BatchNorm2d(k[0]) for k in self.kernel_shapes])
-
-        self.kernels_flat = [np.prod(k) for k in self.kernel_shapes]
-
-        self.embedding = nn.Embedding(
-            num_embeddings=num_embeddings,
-            embedding_dim=np.sum(self.kernels_flat),
-        )
-
-    def forward(self, x):
-        tensor, kernel_indexes = x
-
-        emb = self.embedding(kernel_indexes)
-        kernels = extract_tensors(emb, self.kernel_shapes)
-
-        transformed_tensor = tensor
-        for i, k in enumerate(kernels):
-            ks = self.kernel_shapes[i]
-            transformed_tensor = batch_conv(
-                transformed_tensor,
-                k,
-                p=ks[-1] // 2,
-                s=1,
-            )
-            # TODO Should we batch-norm?
-            # transformed_frame = self.batch_norms[0](transformed_frame)
-            if i != len(kernels) - 1:
-                transformed_tensor = self.activation(transformed_tensor)
-
-        return transformed_tensor
 
 
 # Extensions
