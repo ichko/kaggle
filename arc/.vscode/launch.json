@@ -10,7 +10,9 @@
             "request": "launch",
             "program": "${file}",
             "args": [
-                "--debug"
+                "--debug",
+                "--config",
+                "soft_compute_nca"
             ],
             "console": "integratedTerminal"
         }

@@ -1,5 +1,6 @@
 ## Download dataset
 
+mkdir .reports
 mkdir .models
 mkdir .data
 
