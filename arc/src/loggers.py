@@ -8,18 +8,17 @@ if IS_DEBUG:
     os.environ['WANDB_MODE'] = 'dryrun'
 
 
-class WAndBLogger:
-    def __init__(self, name, info_log_interval, model, hparams, type):
+class WAndB:
+    def __init__(self, name, model, hparams, type):
         assert type in ['video', 'image'], \
             '`type` should be "video" or "image"'
 
         self.type = type
-        self.info_log_interval = info_log_interval
 
         wandb.init(
             name=name,
             dir='.reports',
-            project='forward_models',
+            project='arc',
             config=dict(
                 vars(hparams),
                 name=model.name,

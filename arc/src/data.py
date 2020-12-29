@@ -1,7 +1,7 @@
 import os
 import json
 import numpy as np
-import utils
+import src.utils as utils
 
 import torch
 import torch.utils.data as td

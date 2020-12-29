@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
-import nn_utils as ut
+import src.nn_utils as ut
 
 device = 'cpu'
 
@@ -107,3 +107,12 @@ class SoftAddressableComputationCNN(ut.Module):
             x = torch.softmax(x, dim=1)
 
         return x.unsqueeze(1)
+
+
+def make_model(hparams):
+    return SoftAddressableComputationCNN(
+        input_channels=hparams['input_channels'], )
+
+
+def sanity_check():
+    pass
