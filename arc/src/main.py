@@ -1,24 +1,17 @@
-import data
-import vis
-import models
-import logger
+import src.data as data
+import src.vis as vis
+import src.models as models
+import src.loggers as loggers
+import src.config as config
+import src.utils as utils
 
 import torch
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 
+import argparse
+
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-
-def train(model, dataloader, epochs, epoch_end=lambda _: None):
-    for epoch in tqdm(range(epochs)):
-        tq = tqdm(dataloader)
-        for batch in tq:
-            loss, info = model.optim_step(batch)
-
-            tq.set_description(f'LOSS: {loss:.5f}')
-
-        epoch_end(epoch)
 
 
 # https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
@@ -39,8 +32,33 @@ def evaluate(model, dataloader):
     return error / len(dataloader)
 
 
-if __name__ == '__main__':
+def get_model(hparams):
+    import importlib
+
+    model_module = importlib.import_module(f'src.models.{hparams.model}')
+    model_module.sanity_check()
+
+    model = model_module.make_model(vars(hparams))
+    model.make_persisted(f'.models/{model.name}.weights')
+
+    return model
+
+
+def main(hparams):
+    import pprint
+    import sys
+    from tqdm import tqdm
+
     print('DEVICE:', DEVICE)
+    print(f'## Start training with configuration "{hparams.model.upper()}"')
+
+    if not utils.IS_DEBUG:
+        print('\n\nPress ENTER to continue')
+        _ = input()
+        print('...')
+
+    pp = pprint.PrettyPrinter(4)
+    pp.pprint(vars(hparams))
 
     train_dl = data.load_data(
         '.data/training',
@@ -56,23 +74,36 @@ if __name__ == '__main__':
         device=DEVICE,
     )
 
-    it = iter(train_dl)
-    X, y = next(it)
-
-    saved_model_path = '.models/soft_addressable_cnn.weights'
-
-    model = models.SoftAddressableComputationCNN(input_channels=11)
+    model = get_model(hparams)
     model = model.to(DEVICE)
-    model.make_persisted(saved_model_path)
-    # model = torch.load(f'{saved_model_path}_whole.h5')
 
+    logger = loggers.WAndB(
+        name=hparams.model,
+        model=model,
+        hparams=hparams,
+        type='video',
+    )
+
+    if 'from_scratch' in sys.argv:
+        try:
+            model.preload_weights()
+            print('>>> MODEL PRELOADED')
+        except Exception as e:
+            raise Exception(f'>>> Could not preload! {str(e)}')
+
+    model.configure_optim(lr=hparams.lr)
     model.summary()
 
-    output = model(X)
-    print(output.shape)
+    for epoch in range(hparams.epochs):
 
-    def on_epoch_end(epoch):
-        if epoch % 10 == 0:
+        tq_batches = tqdm(train_dl)
+        for batch in tq_batches:
+            train_loss, train_info = model.optim_step(batch)
+
+            tq_batches.set_description(f'Loss: {train_loss:.6f}')
+            logger.log({'train_loss': train_loss})
+
+        if epoch % hparams.eval_interval == 0:
             train_score = evaluate(model, train_dl)
             val_score = evaluate(model, val_dl)
 
@@ -80,12 +111,23 @@ if __name__ == '__main__':
             print('FINAL TRAIN SCORE:', train_score)
             print('FINAL VAL SCORE:', val_score)
 
-            model.save()
+            logger.log({'train_score': train_score})
+            logger.log({'val_score': val_score})
 
-    model.configure_optim(lr=0.0001)
-    train(
-        epochs=10_000,
-        model=model,
-        dataloader=train_dl,
-        epoch_end=on_epoch_end,
+            model.persist()
+
+    model.save()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--config',
+        help='id of configuration',
     )
+    # parser.add_argument('--from-scratch', action='store_false')
+    parser.add_argument('--debug', action='store_true')
+    args = parser.parse_args()
+
+    hparams = config.get_hparams(args.config)
+    main(hparams)
