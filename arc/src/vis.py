@@ -20,7 +20,7 @@ def plot_pictures(pictures, labels):
     for i, (pict, label) in enumerate(zip(pictures, labels)):
 
         axs[i].imshow(np.array(pict), cmap=cmap, norm=norm)
-        axs[i].grid(True,which='both',color='lightgrey', linewidth=0.5)
+        axs[i].grid(True, which='both', color='lightgrey', linewidth=0.5)
         axs[i].set_title(label)
     plt.show()
 

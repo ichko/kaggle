@@ -81,7 +81,7 @@ def main(hparams):
         name=hparams.model,
         model=model,
         hparams=hparams,
-        type='video',
+        type='image',
     )
 
     if 'from_scratch' in sys.argv:
@@ -95,13 +95,18 @@ def main(hparams):
     model.summary()
 
     for epoch in range(hparams.epochs):
-
         tq_batches = tqdm(train_dl)
-        for batch in tq_batches:
-            train_loss, train_info = model.optim_step(batch)
+        for idx, batch in enumerate(tq_batches):
+            loss, info = model.optim_step(batch)
 
-            tq_batches.set_description(f'Loss: {train_loss:.6f}')
-            logger.log({'train_loss': train_loss})
+            tq_batches.set_description(f'Loss: {loss:.6f}')
+            logger.log({'train_loss': loss})
+
+            if idx % 5 == 0:
+                info['y'] = torch.argmax(info['y'], dim=2)[0]
+                info['y_pred'] = torch.argmax(info['y_pred'], dim=2)[0]
+
+                logger.log_info(info)
 
         if epoch % hparams.eval_interval == 0:
             train_score = evaluate(model, train_dl)
