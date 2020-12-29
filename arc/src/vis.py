@@ -14,15 +14,18 @@ cmap = colors.ListedColormap(pallet)
 norm = colors.Normalize(vmin=0, vmax=len(pallet))
 
 
-def plot_pictures(pictures, labels):
+def plot_pictures(pictures):
     # fig, axs = plt.subplots(1, len(pictures), figsize=(2*len(pictures), 32))
     fig, axs = plt.subplots(1, len(pictures))
-    for i, (pict, label) in enumerate(zip(pictures, labels)):
+    if len(pictures) == 1:
+        axs = [axs]
 
-        axs[i].imshow(np.array(pict), cmap=cmap, norm=norm)
+    for i, pict in enumerate(pictures):
+        axs[i].imshow(pict, cmap=cmap, norm=norm)
         axs[i].grid(True, which='both', color='lightgrey', linewidth=0.5)
-        axs[i].set_title(label)
-    plt.show()
+        axs[i].set_title('')
+
+    return fig
 
 
 def plot_sample(sample, predict=None):

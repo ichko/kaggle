@@ -48,6 +48,8 @@ class WAndB:
         wandb.log({name: [wandb.Image(i) for i in imgs]})
 
     def log_info(self, info, prefix='train'):
+        import src.vis as vis
+
         if hasattr(self.model, 'scheduler'):
             wandb.log({'lr_scheduler': self.model.scheduler.get_lr()[0]})
 
@@ -56,15 +58,8 @@ class WAndB:
         y_pred = info['y_pred'][:num_log_batches].detach().cpu().numpy()
         diff = abs(y - y_pred)
 
-        y = y.astype(np.uint8)
-        y_pred = y_pred.astype(np.uint8)
-        diff = diff.astype(np.uint8)
-
-        wandb_vid_ctor = lambda x: wandb.Video(x, fps=20, format='gif')
-        wrapper_cls = wandb_vid_ctor if self.type == 'video' else wandb.Image
-
         wandb.log({
-            f'{prefix}_y': [wrapper_cls(i) for i in y],
-            f'{prefix}_y_pred': [wrapper_cls(i) for i in y_pred],
-            f'{prefix}_diff': [wrapper_cls(i) for i in diff]
+            f'{prefix}_y': vis.plot_pictures(y[0]),
+            f'{prefix}_y_pred': vis.plot_pictures(y_pred[0]),
+            f'{prefix}_diff': vis.plot_pictures(diff[0])
         })

@@ -103,8 +103,8 @@ def main(hparams):
             logger.log({'train_loss': loss})
 
             if idx % 5 == 0:
-                info['y'] = torch.argmax(info['y'], dim=2)[0]
-                info['y_pred'] = torch.argmax(info['y_pred'], dim=2)[0]
+                info['y'] = torch.argmax(info['y'], dim=2)
+                info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
 
                 logger.log_info(info)
 

@@ -53,6 +53,7 @@ class HyperCNN(nn.Module):
 class SoftAddressableComputationCNN(ut.Module):
     def __init__(self, input_channels):
         super().__init__()
+        # criterion = nn.CrossEntropyLoss() # TODO
 
         num_hyper_kernels = 32
 
