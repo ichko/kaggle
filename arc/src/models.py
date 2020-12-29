@@ -5,27 +5,13 @@ import torch.nn.functional as F
 import numpy as np
 import nn_utils as ut
 
-from tqdm.auto import tqdm
-
 device = 'cpu'
 
-
-class CAModel(nn.Module):
-    # SRC - <https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks/notebook>
-
-    def __init__(self, num_states):
-        super(CAModel, self).__init__()
-        self.transition = nn.Sequential(
-            nn.Conv2d(num_states, 128, kernel_size=3, padding=1), nn.ReLU(),
-            nn.Conv2d(128, num_states, kernel_size=1))
-
-    def forward(self, x, steps=1):
-        for _ in range(steps):
-            x = self.transition(torch.softmax(x, dim=1))
-        return x
+# SRC - <https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks/notebook>
+# class CAModel(nn.Module):
 
 
-class HyperParams(nn.Module):
+class HyperCNN(nn.Module):
     # TODO: something multiheaded would be nice!
 
     def __init__(self, shape):
@@ -94,9 +80,9 @@ class SoftAddressableComputationCNN(ut.Module):
         self.task_feature_extract = ut.time_distribute(
             self.task_feature_extract)
 
-        self.conv_params_1 = HyperParams(
+        self.conv_params_1 = HyperCNN(
             (num_hyper_kernels, 128, input_channels, 5, 5))
-        self.conv_params_2 = HyperParams(
+        self.conv_params_2 = HyperCNN(
             (num_hyper_kernels, input_channels, 128, 5, 5))
 
     def forward(self, batch):
@@ -121,78 +107,3 @@ class SoftAddressableComputationCNN(ut.Module):
             x = torch.softmax(x, dim=1)
 
         return x.unsqueeze(1)
-
-
-def solve_task(task, max_steps=10):
-    model = CAModel(11).to(device)
-    num_epochs = 100
-    criterion = nn.CrossEntropyLoss()
-    losses = np.zeros((max_steps - 1) * num_epochs)
-
-    for num_steps in range(1, max_steps):
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=(0.1 / (num_steps * 2)))
-
-        for e in range(num_epochs):
-            optimizer.zero_grad()
-            loss = 0.0
-
-            for sample in task:
-                # predict output from input
-                x = torch.from_numpy(inp2img(
-                    sample["input"])).unsqueeze(0).float().to(device)
-                y = torch.tensor(
-                    sample["output"]).long().unsqueeze(0).to(device)
-                y_pred = model(x, num_steps)
-                loss += criterion(y_pred, y)
-
-                # predit output from output
-                # enforces stability after solution is reached
-                y_in = torch.from_numpy(inp2img(
-                    sample["output"])).unsqueeze(0).float().to(device)
-                y_pred = model(y_in, 1)
-                loss += criterion(y_pred, y)
-
-            loss.backward()
-            print(loss.item())
-            optimizer.step()
-            losses[(num_steps - 1) * num_epochs + e] = loss.item()
-    return model, num_steps, losses
-
-
-@torch.no_grad()
-def predict(model, task):
-    predictions = []
-    for sample in task:
-        x = torch.from_numpy(inp2img(
-            sample["input"])).unsqueeze(0).float().to(device)
-        pred = model(x, 100).argmax(1).squeeze().cpu().numpy()
-        predictions.append(pred)
-    return predictions
-
-
-def train(model, dataloader, epochs):
-    for epoch in tqdm(range(epochs)):
-        tq = tqdm(dataloader)
-        for batch in tq:
-            loss, info = model.optim_step(batch)
-
-            tq.set_description(f'LOSS: {loss:.5f}')
-
-
-# https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
-# AVG TOP 3 for each task (less is better)
-def evaluate(model, dataloader):
-    error = 0
-    for X, y in tqdm(dataloader):
-        # Currently outputting single prediction per test input
-        y_hat = model(X)
-        y_hat = (y_hat > 0.5).float()
-
-        task_error = 1
-        if y_hat.shape == y.shape and torch.all(y_hat == y).item():
-            task_error = 0
-
-        error += task_error
-
-    return error / len(dataloader)
