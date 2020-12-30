@@ -12,7 +12,7 @@
             "args": [
                 "--debug",
                 "--config",
-                "soft_compute_nca"
+                "hyper_recurrent_ca"
             ],
             "console": "integratedTerminal"
         }

@@ -8,9 +8,9 @@ defaults = dict(
 )
 
 configs = dict(
-    soft_compute_nca=dict(
-        model='soft_compute_nca',
-        nca_iterations=10,
+    hyper_recurrent_cnn=dict(
+        model='hyper_recurrent_cnn',
+        nca_iterations=20,
         input_channels=11,
     ),
     _=None,

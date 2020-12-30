@@ -50,12 +50,13 @@ class HyperCNN(nn.Module):
         return avg_across_demonstrations
 
 
-class SoftAddressableComputationCNN(ut.Module):
-    def __init__(self, input_channels):
+class HyperRecurrentCNN(ut.Module):
+    def __init__(self, input_channels, num_iters):
         super().__init__()
         # criterion = nn.CrossEntropyLoss() # TODO
 
         num_hyper_kernels = 32
+        self.num_iters = num_iters
 
         self.task_feature_extract = nn.Sequential(
             nn.Conv2d(
@@ -101,7 +102,7 @@ class SoftAddressableComputationCNN(ut.Module):
         # TODO: This assumes only single test pair
         test_inputs = test_inputs[:, 0]
         x = test_inputs
-        for i in range(10):
+        for i in range(self.num_iters):
             x = ut.batch_conv(x, layer_1, p=2)
             x = F.relu(x)
             x = ut.batch_conv(x, layer_2, p=2)
@@ -111,8 +112,10 @@ class SoftAddressableComputationCNN(ut.Module):
 
 
 def make_model(hparams):
-    return SoftAddressableComputationCNN(
-        input_channels=hparams['input_channels'], )
+    return HyperRecurrentCNN(
+        input_channels=hparams['input_channels'],
+        num_iters=hparams['nca_iterations'],
+    )
 
 
 def sanity_check():
