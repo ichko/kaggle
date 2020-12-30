@@ -125,7 +125,7 @@ def load_data(path, bs, shuffle, device='cpu'):
         data = data[:max_pairs]
         data = one_hot_channels(data, max_size=num_colors)
         data_len = len(data)
-        data = pad_in_dim(data, pad_size=max_train_pairs, dim=seq_dim)
+        data = pad_in_dim(data, pad_size=max_pairs, dim=seq_dim)
         data = data.astype(np.float32)
         data = torch.Tensor(data).to(device)
 
