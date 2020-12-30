@@ -1,16 +1,16 @@
 from argparse import Namespace
 
 defaults = dict(
-    eval_interval=10,
-    lr=0.0001,
-    epochs=100,
+    eval_interval=50,
+    lr=0.00001,
+    epochs=10,
     model='0',
 )
 
 configs = dict(
     hyper_recurrent_cnn=dict(
         model='hyper_recurrent_cnn',
-        nca_iterations=20,
+        nca_iterations=50,
         input_channels=11,
     ),
     _=None,

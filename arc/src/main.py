@@ -94,34 +94,37 @@ def main(hparams):
     model.configure_optim(lr=hparams.lr)
     model.summary()
 
-    for epoch in range(hparams.epochs):
-        tq_batches = tqdm(train_dl)
-        for idx, batch in enumerate(tq_batches):
-            loss, info = model.optim_step(batch)
+    for num_iters in tqdm(range(2, hparams.nca_iterations)):
+        model.set_num_iters(num_iters)
 
-            tq_batches.set_description(f'Loss: {loss:.6f}')
-            logger.log({'train_loss': loss})
+        for epoch in tqdm(range(hparams.epochs)):
+            tq_batches = tqdm(train_dl)
+            for idx, batch in enumerate(tq_batches):
+                loss, info = model.optim_step(batch)
 
-            if idx % 5 == 0:
-                info['y'] = torch.argmax(info['y'], dim=2)
-                info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
+                tq_batches.set_description(f'Loss: {loss:.6f}')
+                logger.log({'train_loss': loss})
 
-                logger.log_info(info)
+                if idx % 5 == 0:
+                    info['y'] = torch.argmax(info['y'], dim=2)
+                    info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
 
-        if epoch % hparams.eval_interval == 0:
-            train_score = evaluate(model, train_dl)
-            val_score = evaluate(model, val_dl)
+                    logger.log_info(info)
 
-            print(f'====== EPOCH {epoch} END ======')
-            print('FINAL TRAIN SCORE:', train_score)
-            print('FINAL VAL SCORE:', val_score)
+            if epoch % hparams.eval_interval == 0:
+                train_score = evaluate(model, train_dl)
+                val_score = evaluate(model, val_dl)
 
-            logger.log({'train_score': train_score})
-            logger.log({'val_score': val_score})
+                print(f'====== EPOCH {epoch} END ======')
+                print('FINAL TRAIN SCORE:', train_score)
+                print('FINAL VAL SCORE:', val_score)
 
-            model.persist()
+                logger.log({'train_score': train_score})
+                logger.log({'val_score': val_score})
 
-    model.save()
+                model.persist()
+
+        model.save()
 
 
 if __name__ == '__main__':
