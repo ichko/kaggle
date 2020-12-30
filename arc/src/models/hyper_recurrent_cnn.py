@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,7 +18,10 @@ class HyperCNN(nn.Module):
 
     def __init__(self, shape):
         super().__init__()
-        self.params = nn.Parameter(torch.randn(shape))
+        self.params = nn.Parameter(torch.rand(shape))
+        # TODO: Add bias parameter
+        nn.init.kaiming_uniform_(self.params, a=math.sqrt(5))
+
         self.params.requires_grad = True
 
     def forward_single_task(self, task_features):
@@ -51,6 +56,9 @@ class HyperCNN(nn.Module):
 
 
 class HyperRecurrentCNN(ut.Module):
+    def set_num_iters(self, num_iters):
+        self.num_iters = num_iters
+
     def __init__(self, input_channels, num_iters):
         super().__init__()
         # criterion = nn.CrossEntropyLoss() # TODO
@@ -59,6 +67,7 @@ class HyperRecurrentCNN(ut.Module):
         self.num_iters = num_iters
 
         self.task_feature_extract = nn.Sequential(
+            # TODO: Use nn_utils.conv_block
             nn.Conv2d(
                 input_channels * 2,
                 128,
@@ -103,6 +112,7 @@ class HyperRecurrentCNN(ut.Module):
         test_inputs = test_inputs[:, 0]
         x = test_inputs
         for i in range(self.num_iters):
+            # TODO: Add batch norm
             x = ut.batch_conv(x, layer_1, p=2)
             x = F.relu(x)
             x = ut.batch_conv(x, layer_2, p=2)
