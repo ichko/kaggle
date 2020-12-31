@@ -75,21 +75,21 @@ class HyperConv2D(nn.Module):
 class CA(nn.Module):
     def __init__(self, num_hyper_kernels, input_channels):
         super().__init__()
-        self.conv_params_1 = HyperConv2D(
+        self.conv_1 = HyperConv2D(
             (num_hyper_kernels, 64, input_channels, 5, 5))
-        self.conv_params_2 = HyperConv2D(
+        self.conv_2 = HyperConv2D(
             (num_hyper_kernels, input_channels, 64, 5, 5))
 
     def forward(self, task_features, test_inputs, num_iters):
-        self.conv_params_1.infer_params(task_features)
-        self.conv_params_2.infer_params(task_features)
+        self.conv_1.infer_params(task_features)
+        self.conv_2.infer_params(task_features)
 
         def solve_task(x):
             for _i in range(num_iters):
                 # TODO: Add batch norm
-                x = self.conv_params_1(x)
+                x = self.conv_1(x)
                 x = F.relu(x)
-                x = self.conv_params_2(x)
+                x = self.conv_2(x)
                 x = torch.softmax(x, dim=1)
 
             return torch.log(x)
