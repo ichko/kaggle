@@ -65,23 +65,14 @@ class HyperRecurrentCNN(ut.Module):
         self.num_iters = num_iters
 
         self.task_feature_extract = nn.Sequential(
-            # TODO: Use nn_utils.conv_block
-            nn.Conv2d(
-                input_channels * 2,
-                128,
-                kernel_size=5,
-                stride=2,
-                padding=2,
+            ut.conv_block(
+                i=input_channels * 2, o=128, ks=5, s=2, p=2, \
+                a=ut.leaky(),
             ),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, kernel_size=5, stride=2, padding=2),
-            nn.ReLU(),
-            nn.Conv2d(128, 64, kernel_size=5, stride=2, padding=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=5, stride=2, padding=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=2, stride=1, padding=0),
-            nn.ReLU(),
+            ut.conv_block(i=128, o=128, ks=5, s=2, p=2, a=ut.leaky()),
+            ut.conv_block(i=128, o=64, ks=5, s=2, p=2, a=ut.leaky()),
+            ut.conv_block(i=64, o=64, ks=5, s=2, p=2, a=ut.leaky()),
+            ut.conv_block(i=64, o=128, ks=2, s=1, p=0, a=ut.leaky()),
             ut.Reshape(-1, 128),
             nn.Linear(128, num_hyper_kernels),
             nn.Softmax(dim=1),
@@ -122,10 +113,11 @@ class HyperRecurrentCNN(ut.Module):
     def optim_step(self, batch, optim_kw={}):
         X, y = batch
 
-        y_argmax = torch.argmax(y, dim=2)
+        channel_dim = 2
+        y_argmax = torch.argmax(y, dim=channel_dim)
         y_pred = self.optim_forward(X)
 
-        bs, seq = y_argmax.shape[:2]
+        bs, seq = y_pred.shape[:2]
         loss = F.nll_loss(
             input=y_pred.reshape(bs * seq, *y_pred.shape[-3:]),
             target=y_argmax.reshape(bs * seq, *y_argmax.shape[-2:]),
