@@ -18,17 +18,20 @@ class HyperCNN(nn.Module):
 
     def __init__(self, shape):
         super().__init__()
-        self.params = nn.Parameter(torch.rand(shape))
+        self.weights = nn.Parameter(torch.rand(shape))
         # TODO: Add bias parameter
-        nn.init.kaiming_uniform_(self.params, a=math.sqrt(5))
+        # self.bias = nn.Parameter(torch.Tensor(out_channels))
 
-        self.params.requires_grad = True
+        nn.init.kaiming_uniform_(self.weights, a=math.sqrt(5))
+
+        self.weights.requires_grad = True
+        self.layer_params = None
 
     def forward_single_task(self, task_features):
         repeated_dims = [
-            task_features.shape[0], *([1] * len(self.params.shape))
+            task_features.shape[0], *([1] * len(self.weights.shape))
         ]
-        batched_conv_params = self.params.unsqueeze(0).repeat(*repeated_dims)
+        batched_conv_params = self.weights.unsqueeze(0).repeat(*repeated_dims)
 
         task_features = task_features.unsqueeze(2).unsqueeze(2).unsqueeze(
             2).unsqueeze(2)
@@ -41,7 +44,7 @@ class HyperCNN(nn.Module):
 
         return conv_params_per_demonstration
 
-    def forward(self, task_features):
+    def infer_params(self, task_features):
         conv_params_per_demonstration = ut.time_distribute(
             self.forward_single_task, task_features)
 
@@ -52,7 +55,14 @@ class HyperCNN(nn.Module):
             dim=1,
         )
 
-        return avg_across_demonstrations
+        self.layer_params = avg_across_demonstrations
+
+    def forward(self, x):
+        if self.layer_params is None:
+            raise Exception('Params are not yet inferred!')
+
+        x = ut.batch_conv(x, self.layer_params, p=2)
+        return x
 
 
 class HyperRecurrentCNN(ut.Module):
@@ -94,15 +104,15 @@ class HyperRecurrentCNN(ut.Module):
         train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
 
         task_features = self.task_feature_extract(train_io)
-        layer_1 = self.conv_params_1(task_features)
-        layer_2 = self.conv_params_2(task_features)
+        self.conv_params_1.infer_params(task_features)
+        self.conv_params_2.infer_params(task_features)
 
         def solve_task(x):
             for _i in range(self.num_iters):
                 # TODO: Add batch norm
-                x = ut.batch_conv(x, layer_1, p=2)
+                x = self.conv_params_1(x)
                 x = F.relu(x)
-                x = ut.batch_conv(x, layer_2, p=2)
+                x = self.conv_params_2(x)
                 x = torch.softmax(x, dim=1)
 
             return torch.log(x)
