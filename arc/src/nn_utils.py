@@ -123,7 +123,7 @@ class DenseAE(Module):
         return x
 
 
-def get_activation():
+def leaky():
     LEAKY_SLOPE = 0.2
     return nn.LeakyReLU(LEAKY_SLOPE, inplace=True)
 
@@ -176,7 +176,7 @@ def batch_conv(x, w, p=0, s=1):
     return o
 
 
-def dense(i, o, a=get_activation()):
+def dense(i, o, a=leaky()):
     l = nn.Linear(i, o)
     return l if a is None else nn.Sequential(l, a)
 
@@ -203,7 +203,7 @@ def resize(t, size):
     return F.interpolate(t, size, mode='bicubic', align_corners=True)
 
 
-def conv_block(i, o, ks, s, p, a=get_activation(), d=1, bn=True):
+def conv_block(i, o, ks, s, p, a=leaky(), d=1, bn=True):
     block = [nn.Conv2d(i, o, kernel_size=ks, stride=s, padding=p, dilation=d)]
     if bn:
         block.append(nn.BatchNorm2d(o))
@@ -213,7 +213,7 @@ def conv_block(i, o, ks, s, p, a=get_activation(), d=1, bn=True):
     return nn.Sequential(*block)
 
 
-def deconv_block(i, o, ks, s, p, a=get_activation(), d=1, bn=True):
+def deconv_block(i, o, ks, s, p, a=leaky(), d=1, bn=True):
     block = [
         nn.ConvTranspose2d(
             i,
@@ -254,15 +254,15 @@ def stack_conv_blocks(block_ctor, sizes, ks, a, s, p):
     return nn.Sequential(*layers)
 
 
-def conv_encoder(sizes, ks=4, a=get_activation()):
+def conv_encoder(sizes, ks=4, a=leaky()):
     return stack_conv_blocks(conv_block, sizes, ks, a, s=2, p=ks // 2 - 1)
 
 
-def conv_transform(sizes, ks=5, s=1, a=get_activation()):
+def conv_transform(sizes, ks=5, s=1, a=leaky()):
     return stack_conv_blocks(conv_block, sizes, ks, a, s, p=ks // 2)
 
 
-def conv_decoder(sizes, ks=4, s=2, a=get_activation()):
+def conv_decoder(sizes, ks=4, s=2, a=leaky()):
     return stack_conv_blocks(deconv_block, sizes, ks, a, s=s, p=ks // 2 - 1)
 
 
@@ -299,7 +299,7 @@ class ConvToFlat(nn.Module):
             out_size,
             ks=4,
             s=2,
-            a=get_activation(),
+            a=leaky(),
     ):
         super().__init__()
         self.channel_sizes = channel_sizes
