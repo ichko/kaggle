@@ -61,8 +61,6 @@ class HyperRecurrentCNN(ut.Module):
 
     def __init__(self, input_channels, num_iters):
         super().__init__()
-        # criterion = nn.CrossEntropyLoss() # TODO
-
         num_hyper_kernels = 32
         self.num_iters = num_iters
 
@@ -108,17 +106,41 @@ class HyperRecurrentCNN(ut.Module):
         layer_1 = self.conv_params_1(task_features)
         layer_2 = self.conv_params_2(task_features)
 
-        # TODO: This assumes only single test pair
-        test_inputs = test_inputs[:, 0]
-        x = test_inputs
-        for i in range(self.num_iters):
-            # TODO: Add batch norm
-            x = ut.batch_conv(x, layer_1, p=2)
-            x = F.relu(x)
-            x = ut.batch_conv(x, layer_2, p=2)
-            x = torch.softmax(x, dim=1)
+        def solve_task(x):
+            for _i in range(self.num_iters):
+                # TODO: Add batch norm
+                x = ut.batch_conv(x, layer_1, p=2)
+                x = F.relu(x)
+                x = ut.batch_conv(x, layer_2, p=2)
+                x = torch.softmax(x, dim=1)
 
-        return x.unsqueeze(1)
+            return torch.log(x)
+
+        result = ut.time_distribute(solve_task, test_inputs)
+        return result
+
+    def optim_step(self, batch, optim_kw={}):
+        X, y = batch
+
+        y_argmax = torch.argmax(y, dim=2)
+        y_pred = self.optim_forward(X)
+
+        bs, seq = y_argmax.shape[:2]
+        loss = F.nll_loss(
+            input=y_pred.reshape(bs * seq, *y_pred.shape[-3:]),
+            target=y_argmax.reshape(bs * seq, *y_argmax.shape[-2:]),
+        )
+
+        if loss.requires_grad:
+            self.optim.zero_grad()
+            loss.backward()
+            self.optim.step()
+
+        return loss.item(), {
+            'X': X,
+            'y_pred': y_pred,
+            'y': y,
+        }
 
 
 def make_model(hparams):
