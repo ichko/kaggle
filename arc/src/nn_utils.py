@@ -157,7 +157,7 @@ def count_parameters(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
 
 
-def batch_conv(x, w, p=0, s=1):
+def batch_conv(x, w, b, p=0, s=1):
     # SRC - https://discuss.pytorch.org/t/apply-different-convolutions-to-a-batch-of-tensors/56901/2
 
     batch_size = x.size(0)
@@ -166,6 +166,7 @@ def batch_conv(x, w, p=0, s=1):
     o = F.conv2d(
         x.reshape(1, batch_size * x.size(1), x.size(2), x.size(3)),
         w.reshape(batch_size * w.size(1), w.size(2), w.size(3), w.size(4)),
+        b.reshape(batch_size * b.size(1)),
         groups=batch_size,
         padding=p,
         stride=s,
@@ -461,10 +462,13 @@ def time_distribute(module, input=None):
     else:
         input = input.reshape(-1, *shape[2:])
 
-    out = module(input)
-    out = out.view(bs, seq_len, *out.shape[1:])
+    out = module(input)  # should return iterable or tensor
 
-    return out
+    if hasattr(out, 'view'):
+        # assume it is tensor:
+        return out.view(bs, seq_len, *out.shape[1:])
+
+    return map(lambda o: o.view(bs, seq_len, *o.shape[1:]), out)
 
 
 class TimeDistributed(nn.Module):
