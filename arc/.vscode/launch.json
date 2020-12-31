@@ -8,11 +8,12 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            // "program": "${file}",
+            "program": "src/main.py",
             "args": [
                 "--debug",
                 "--config",
-                "hyper_recurrent_ca"
+                "hyper_recurrent_cnn"
             ],
             "console": "integratedTerminal"
         }
