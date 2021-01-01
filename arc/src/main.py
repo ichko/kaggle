@@ -62,7 +62,7 @@ def main(hparams):
 
     train_dl = data.load_data(
         '.data/training',
-        bs=20,
+        bs=hparams.bs,
         shuffle=False,
         device=DEVICE,
     )
@@ -94,10 +94,10 @@ def main(hparams):
     model.configure_optim(lr=hparams.lr)
     model.summary()
 
-    for num_iters in tqdm(range(2, hparams.nca_iterations)):
-        model.set_num_iters(num_iters)
+    for epoch in tqdm(range(hparams.epochs)):
+        for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
+            model.set_num_iters(num_iters)
 
-        for epoch in tqdm(range(hparams.epochs)):
             tq_batches = tqdm(train_dl)
             for idx, batch in enumerate(tq_batches):
                 loss, info = model.optim_step(batch)
@@ -111,18 +111,18 @@ def main(hparams):
 
                     logger.log_info(info)
 
-            if epoch % hparams.eval_interval == 0:
-                train_score = evaluate(model, train_dl)
-                val_score = evaluate(model, val_dl)
+        if epoch % hparams.eval_interval == 0:
+            train_score = evaluate(model, train_dl)
+            val_score = evaluate(model, val_dl)
 
-                print(f'====== EPOCH {epoch} END ======')
-                print('FINAL TRAIN SCORE:', train_score)
-                print('FINAL VAL SCORE:', val_score)
+            print(f'====== EPOCH {epoch} END ======')
+            print('FINAL TRAIN SCORE:', train_score)
+            print('FINAL VAL SCORE:', val_score)
 
-                logger.log({'train_score': train_score})
-                logger.log({'val_score': val_score})
+            logger.log({'train_score': train_score})
+            logger.log({'val_score': val_score})
 
-                model.persist()
+            model.persist()
 
         model.save()
 
