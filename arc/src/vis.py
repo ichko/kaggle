@@ -30,11 +30,3 @@ def plot_pictures(pictures):
         axs[i].set_title('')
 
     return fig
-
-
-def plot_sample(sample, predict=None):
-    if predict is None:
-        plot_pictures([sample['input'], sample['output']], ['Input', 'Output'])
-    else:
-        plot_pictures([sample['input'], sample['output'], predict],
-                      ['Input', 'Output', 'Predict'])

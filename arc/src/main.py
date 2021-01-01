@@ -63,7 +63,7 @@ def main(hparams):
     train_dl = data.load_data(
         '.data/training',
         bs=hparams.bs,
-        shuffle=False,
+        shuffle=True,
         device=DEVICE,
     )
 
@@ -95,23 +95,22 @@ def main(hparams):
     model.summary()
 
     for epoch in tqdm(range(hparams.epochs)):
-        for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
-            model.set_num_iters(num_iters)
+        # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
+        # model.set_num_iters(num_iters)
 
-            tq_batches = tqdm(train_dl)
-            for idx, batch in enumerate(tq_batches):
-                loss, info = model.optim_step(batch)
+        tq_batches = tqdm(train_dl)
+        for idx, batch in enumerate(tq_batches):
+            loss, info = model.optim_step(batch)
 
-                tq_batches.set_description(f'Loss: {loss:.6f}')
-                logger.log({'train_loss': loss})
-
-                if idx % 5 == 0:
-                    info['y'] = torch.argmax(info['y'], dim=2)
-                    info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
-
-                    logger.log_info(info)
+            tq_batches.set_description(f'Loss: {loss:.6f}')
+            logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
+            info['y'] = torch.argmax(info['y'], dim=2)
+            info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
+
+            logger.log_info(info)
+
             train_score = evaluate(model, train_dl)
             val_score = evaluate(model, val_dl)
 

@@ -67,7 +67,7 @@ class HyperConv2D(nn.Module):
             raise Exception('Params are not yet inferred!')
 
         w, b = self.layer_params
-        x = ut.batch_conv(x, w, b, p=2)
+        x = ut.batch_conv(x, w, b, p=1)
 
         return x
 
@@ -76,28 +76,27 @@ class CA(nn.Module):
     def __init__(self, num_hyper_kernels, input_channels):
         super().__init__()
         self.conv_1 = HyperConv2D(
-            (num_hyper_kernels, 64, input_channels, 5, 5))
+            (num_hyper_kernels, 64, input_channels, 3, 3))
         self.bn_1 = nn.BatchNorm2d(64)
 
         self.conv_2 = HyperConv2D(
-            (num_hyper_kernels, input_channels, 64, 5, 5))
-        self.bn_2 = nn.BatchNorm2d(input_channels)
+            (num_hyper_kernels, input_channels, 64, 3, 3))
 
     def forward(self, task_features, test_inputs, num_iters):
         self.conv_1.infer_params(task_features)
         self.conv_2.infer_params(task_features)
 
         def solve_task(x):
+            seq = []
             for _i in range(num_iters):
-                # TODO: Add batch norm
                 x = self.conv_1(x)
                 x = self.bn_1(x)
                 x = F.leaky_relu(x, negative_slope=0.5)
                 x = self.conv_2(x)
-                x = self.bn_2(x)
                 x = torch.softmax(x, dim=1)
+                seq.append(x.clone().unsqueeze(1))
 
-            return torch.log(x)
+            return torch.log(torch.cat(seq, dim=1))
 
         return ut.time_distribute(solve_task, test_inputs)
 
@@ -108,7 +107,7 @@ class HyperRecurrentCNN(ut.Module):
 
     def __init__(self, input_channels, num_iters):
         super().__init__()
-        num_hyper_kernels = 32
+        num_hyper_kernels = 64
         self.num_iters = num_iters
 
         self.task_feature_extract = nn.Sequential(
@@ -153,10 +152,19 @@ class HyperRecurrentCNN(ut.Module):
         y_pred = self.optim_forward(X)
 
         bs, seq = y_pred.shape[:2]
-        loss = F.nll_loss(
-            input=y_pred.reshape(bs * seq, *y_pred.shape[-3:]),
-            target=y_argmax.reshape(bs * seq, *y_argmax.shape[-2:]),
-        )
+        loss = 0
+
+        seq_dims = list(range(3, y_pred.size(2)))
+        weights_sum = 0
+        for i in seq_dims:
+            weight = (i - seq_dims[0]) / (len(seq_dims) - 1)
+            weights_sum += weight
+            loss += F.nll_loss(
+                input=y_pred[:, :, i].reshape(bs * seq, *y_pred.shape[-3:]),
+                target=y_argmax.reshape(bs * seq, *y_argmax.shape[-2:]),
+            ) * weight
+
+        loss /= weights_sum
 
         if loss.requires_grad:
             self.optim.zero_grad()
@@ -165,7 +173,7 @@ class HyperRecurrentCNN(ut.Module):
 
         return loss.item(), {
             'X': X,
-            'y_pred': y_pred,
+            'y_pred': y_pred[:, :, -1],
             'y': y,
         }
 
