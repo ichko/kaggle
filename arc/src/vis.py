@@ -13,6 +13,10 @@ cmap = colors.ListedColormap(pallet)
 
 norm = colors.Normalize(vmin=0, vmax=len(pallet))
 
+# TODO: Show distrib of different tasks kernel picking vectors
+# TODO: Plot whole task (single image)
+# TODO: Plot difference between different kernels
+
 
 def plot_pictures(pictures):
     # fig, axs = plt.subplots(1, len(pictures), figsize=(2*len(pictures), 32))
