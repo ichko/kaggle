@@ -157,7 +157,7 @@ class HyperRecurrentCNN(ut.Module):
         seq_dims = list(range(3, y_pred.size(2)))
         weights_sum = 0
         for i in seq_dims:
-            weight = (i - seq_dims[0]) / (len(seq_dims) - 1)
+            weight = ((i - seq_dims[0]) / (len(seq_dims) - seq_dims[0] - 1))**4
             weights_sum += weight
             loss += F.nll_loss(
                 input=y_pred[:, :, i].reshape(bs * seq, *y_pred.shape[-3:]),
