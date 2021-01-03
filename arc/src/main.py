@@ -94,6 +94,8 @@ def main(hparams):
     model.configure_optim(lr=hparams.lr)
     model.summary()
 
+    # TODO: Infer patterns with computed program on train tasks
+
     for epoch in tqdm(range(hparams.epochs)):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
         # model.set_num_iters(num_iters)
