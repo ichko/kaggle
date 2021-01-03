@@ -182,10 +182,9 @@ class HyperRecurrentCNN(ut.Module):
 
         return loss.item(), {
             'X': X,
-            'y_pred': y_pred[:, :, -1],
             'y': y,
+            'y_pred': y_pred[:, :, -1],
             'task_features': self.task_features,
-            'batch': batch,
         }
 
 

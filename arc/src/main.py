@@ -110,6 +110,12 @@ def main(hparams):
             info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
 
             logger.log_info(info)
+            fig = vis.plot_task_inference(
+                batch=info['X'],
+                test_preds=info['y_pred'],
+                idx=0,
+            )
+            logger.log({'task': fig})
 
             train_score = evaluate(model, train_dl)
             val_score = evaluate(model, val_dl)

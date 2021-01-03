@@ -2,8 +2,8 @@ from argparse import Namespace
 
 defaults = dict(
     eval_interval=50,
-    lr=0.00001,
-    epochs=1000,
+    lr=0.00002,
+    epochs=1_000_000,
     model='0',
     bs=8,
 )

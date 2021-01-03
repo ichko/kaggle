@@ -27,6 +27,8 @@ def load_folder(path):
     result = dict()
 
     file_names = os.listdir(path)
+    file_names = file_names[:8]
+
     if utils.IS_DEBUG:
         # load only 10 files in debug mode
         file_names = file_names[:32]
@@ -44,7 +46,6 @@ def load_folder(path):
 
 
 def one_hot_channels(inp, max_size):
-    inp = np.array(inp)
     img = np.full(
         (inp.shape[0], max_size, inp.shape[1], inp.shape[2]),
         0,
@@ -123,10 +124,11 @@ def load_data(path, bs, shuffle, device='cpu'):
         train_test, io = selectors
         data = [t[io] for t in tasks[idx][train_test]]
         data = data[:max_pairs]
-        data = one_hot_channels(data, max_size=num_colors)
+        data = np.array(data)
+        # data = one_hot_channels(data, max_size=num_colors)
+        # data = data.astype(np.float32)
         data_len = len(data)
         data = pad_in_dim(data, pad_size=max_pairs, dim=seq_dim)
-        data = data.astype(np.float32)
         data = torch.Tensor(data).to(device)
 
         return data, data_len
@@ -147,6 +149,7 @@ def load_data(path, bs, shuffle, device='cpu'):
                 train_inputs=train_in,
                 train_outputs=train_out,
                 test_inputs=test_in,
+                test_outputs=test_out,
             ), test_out,
 
     dl = td.DataLoader(
