@@ -18,8 +18,45 @@ norm = colors.Normalize(vmin=0, vmax=len(pallet))
 # TODO: Plot difference between different kernels
 
 
+def normalize_board(board):
+    return board.detach().cpu().numpy()
+
+
+def plot_task_inference(batch, idx, test_preds=None, size=2):
+    task = {k: v[idx] for k, v in batch.items()}
+    if test_preds is not None:
+        task['test_preds'] = test_preds[idx]
+        task['test_diff'] = abs(task['test_outputs'] - test_preds[idx])
+
+    max_len = max(task['train_len'], task['test_len'])
+    should_show_preds = 'test_preds' in task
+
+    rows = max_len
+    cols = 5 + should_show_preds
+    col_names = [
+        'train_inputs',
+        'train_outputs',
+        'test_inputs',
+        'test_outputs',
+    ] + ['test_preds', 'test_diff'] if should_show_preds else []
+
+    fig = plt.figure(figsize=(cols * size, rows * size))
+
+    for r in range(rows):
+        for c, col in enumerate(col_names):
+            if len(task[col]) <= r: continue
+            ax = fig.add_subplot(rows, cols, r * cols + c + 1)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(f'{col}[{r}]')
+            ax.imshow(normalize_board(task[col][r]), cmap=cmap)
+
+    fig.tight_layout()
+
+    return fig
+
+
 def plot_pictures(pictures):
-    # fig, axs = plt.subplots(1, len(pictures), figsize=(2*len(pictures), 32))
     fig, axs = plt.subplots(1, len(pictures))
     if len(pictures) == 1:
         axs = [axs]

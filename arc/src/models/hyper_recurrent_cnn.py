@@ -141,6 +141,7 @@ class HyperRecurrentCNN(ut.Module):
 
         task_features = self.task_feature_extract(train_io)
         result = self.ca(task_features, test_inputs, self.num_iters)
+        self.task_features = task_features  # Save to return as info param
 
         return result
 
@@ -149,7 +150,7 @@ class HyperRecurrentCNN(ut.Module):
 
         channel_dim = 2
         y_argmax = torch.argmax(y, dim=channel_dim)
-        y_pred = self.optim_forward(X)
+        y_pred = self.forward(X)
 
         bs, seq = y_pred.shape[:2]
         loss = 0
@@ -157,7 +158,7 @@ class HyperRecurrentCNN(ut.Module):
         seq_dims = list(range(3, y_pred.size(2)))
         weights_sum = 0
         for i in seq_dims:
-            weight = ((i - seq_dims[0]) / (len(seq_dims) - seq_dims[0] - 1))**4
+            weight = ((i - seq_dims[0]) / (len(seq_dims) - seq_dims[0] - 1))**2
             weights_sum += weight
             loss += F.nll_loss(
                 input=y_pred[:, :, i].reshape(bs * seq, *y_pred.shape[-3:]),
@@ -175,6 +176,8 @@ class HyperRecurrentCNN(ut.Module):
             'X': X,
             'y_pred': y_pred[:, :, -1],
             'y': y,
+            'task_features': self.task_features,
+            'batch': batch,
         }
 
 
