@@ -128,14 +128,6 @@ def leaky():
     return nn.LeakyReLU(LEAKY_SLOPE, inplace=True)
 
 
-def one_hot(t, one_hot_size=None):
-    one_hot_size = t.max() + 1 if one_hot_size is None else one_hot_size
-
-    hot = torch.zeros((t.size(0), one_hot_size))
-    hot[torch.arange(t.size(0)), t] = 1
-    return hot
-
-
 def cat_channels():
     """
         Concatenate number of channels in a single tensor

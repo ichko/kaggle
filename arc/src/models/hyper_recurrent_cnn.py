@@ -101,6 +101,13 @@ class CA(nn.Module):
         return ut.time_distribute(solve_task, test_inputs)
 
 
+def one_hot_channels(tensor):
+    tensor = F.one_hot(tensor.long(), num_classes=11).float()
+    # Move the one hot encoded dimension in the channel dim
+    tensor = tensor.permute(0, 1, 4, 2, 3)
+    return tensor
+
+
 class HyperRecurrentCNN(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
@@ -132,9 +139,9 @@ class HyperRecurrentCNN(ut.Module):
         )
 
     def forward(self, batch):
-        train_inputs = batch['train_inputs']
-        train_outputs = batch['train_outputs']
-        test_inputs = batch['test_inputs']
+        train_inputs = one_hot_channels(batch['train_inputs'])
+        train_outputs = one_hot_channels(batch['train_outputs'])
+        test_inputs = one_hot_channels(batch['test_inputs'])
 
         channel_dim = 2
         train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
@@ -147,6 +154,7 @@ class HyperRecurrentCNN(ut.Module):
 
     def optim_step(self, batch, optim_kw={}):
         X, y = batch
+        y = one_hot_channels(y)
 
         channel_dim = 2
         y_argmax = torch.argmax(y, dim=channel_dim)
