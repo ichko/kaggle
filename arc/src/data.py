@@ -104,8 +104,8 @@ def normalize_obj(obj):
 def pad_in_dim(tensor, pad_size, dim, val=0):
     shape = list(tensor.shape)
     shape[dim] = pad_size - shape[dim]
-    padding = np.full(shape, val)
-    out = np.concatenate([tensor, padding], axis=dim)
+    padding = torch.full(shape, val).to(tensor.device)
+    out = torch.cat([tensor, padding], dim=dim)
 
     return out
 
@@ -128,8 +128,9 @@ def load_data(path, bs, shuffle, device='cpu'):
         # data = one_hot_channels(data, max_size=num_colors)
         # data = data.astype(np.float32)
         data_len = len(data)
+        data = torch.Tensor(data)
         data = pad_in_dim(data, pad_size=max_pairs, dim=seq_dim)
-        data = torch.Tensor(data).to(device)
+        data = data.to(device)
 
         return data, data_len
 
@@ -138,19 +139,34 @@ def load_data(path, bs, shuffle, device='cpu'):
             return len(tasks)
 
         def __getitem__(self, id):
+            # TODO: Vary the paris which are used to do param inference
             train_in, train_len = get(['train', 'input'], id, max_train_pairs)
             train_out, _ = get(['train', 'output'], id, max_train_pairs)
             test_in, test_len = get(['test', 'input'], id, max_test_pairs)
             test_out, _ = get(['test', 'output'], id, max_test_pairs)
 
+            # Infer over each demonstration, both in train and test pairs
+            all_in = torch.cat([train_in[:train_len], test_in[:test_len]])
+            all_out = torch.cat([train_out[:train_len], test_out[:test_len]])
+            all_len = train_len + test_len
+            max_all_pairs = max_train_pairs + max_test_pairs
+
+            all_in = pad_in_dim(all_in, pad_size=max_all_pairs, dim=seq_dim)
+            all_out = pad_in_dim(all_out, pad_size=max_all_pairs, dim=seq_dim)
+
             return dict(
-                train_len=train_len,
-                test_len=test_len,
                 train_inputs=train_in,
                 train_outputs=train_out,
+                train_len=train_len,
+                #
                 test_inputs=test_in,
                 test_outputs=test_out,
-            ), test_out,
+                test_len=test_len,
+                #
+                infer_inputs=all_in,
+                infer_outputs=all_out,
+                infer_len=all_len,
+            ), all_out,
 
     dl = td.DataLoader(
         Dataset(),
