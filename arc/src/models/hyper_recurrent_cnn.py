@@ -33,7 +33,7 @@ class HyperConv2D(nn.Module):
 
         self.layer_params = None
 
-    def infer_params(self, task_features):
+    def infer_params(self, task_features, infer_inputs):
         def forward_single_task(features):
             rep_dims_w = [features.shape[0], *([1] * len(self.weights.shape))]
             rep_dims_b = [features.shape[0], *([1] * len(self.bias.shape))]
@@ -57,19 +57,24 @@ class HyperConv2D(nn.Module):
 
         # TODO: This should be changed to something more expressive.
         # Now we just avg across demonstrations.
-        w_mean = torch.mean(w, dim=1)
-        b_mean = torch.mean(b, dim=1)
+        w = torch.mean(w, dim=1)
+        b = torch.mean(b, dim=1)
 
-        self.layer_params = w_mean, b_mean
+        num_inference_pairs = infer_inputs.size(1)
+        w = ut.unsqueeze_expand(w, dim=1, times=num_inference_pairs)
+        b = ut.unsqueeze_expand(b, dim=1, times=num_inference_pairs)
+
+        w = ut.reshape_in_time(w)
+        b = ut.reshape_in_time(b)
+
+        self.layer_params = w, b
 
     def forward(self, x):
         if self.layer_params is None:
             raise Exception('Params are not yet inferred!')
 
         w, b = self.layer_params
-        x = ut.batch_conv(x, w, b, p=1)
-
-        return x
+        return ut.batch_conv(x, w, b, p=1)
 
 
 class CA(nn.Module):
@@ -82,9 +87,9 @@ class CA(nn.Module):
         self.conv_2 = HyperConv2D(
             (num_hyper_kernels, input_channels, 64, 3, 3))
 
-    def forward(self, task_features, test_inputs, num_iters):
-        self.conv_1.infer_params(task_features)
-        self.conv_2.infer_params(task_features)
+    def forward(self, task_features, infer_inputs, num_iters):
+        self.conv_1.infer_params(task_features, infer_inputs)
+        self.conv_2.infer_params(task_features, infer_inputs)
 
         def solve_task(x):
             seq = []
@@ -98,7 +103,7 @@ class CA(nn.Module):
 
             return torch.log(torch.cat(seq, dim=1))
 
-        return ut.time_distribute(solve_task, test_inputs)
+        return ut.time_distribute(solve_task, infer_inputs)
 
 
 def one_hot_channels(tensor):
@@ -141,18 +146,19 @@ class HyperRecurrentCNN(ut.Module):
     def forward(self, batch):
         train_inputs = one_hot_channels(batch['train_inputs'])
         train_outputs = one_hot_channels(batch['train_outputs'])
-        test_inputs = one_hot_channels(batch['test_inputs'])
+        infer_inputs = one_hot_channels(batch['infer_inputs'])
 
         channel_dim = 2
         train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
 
         task_features = self.task_feature_extract(train_io)
-        result = self.ca(task_features, test_inputs, self.num_iters)
+        result = self.ca(task_features, infer_inputs, self.num_iters)
         self.task_features = task_features  # Save to return as info param
 
         return result
 
     def optim_step(self, batch, optim_kw={}):
+        # TODO: Remove padded predictions
         X, y = batch
         y = one_hot_channels(y)
 
