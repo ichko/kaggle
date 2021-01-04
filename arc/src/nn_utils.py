@@ -128,6 +128,17 @@ def leaky():
     return nn.LeakyReLU(LEAKY_SLOPE, inplace=True)
 
 
+def unsqueeze_expand(tensor, dim, times):
+    tensor = tensor.unsqueeze(dim)
+    new_shape = list(tensor.shape)
+    new_shape[dim] = times
+    return tensor.expand(new_shape)
+
+
+def reshape_in_time(tensor):
+    return tensor.reshape(-1, *tensor.shape[2:])
+
+
 def cat_channels():
     """
         Concatenate number of channels in a single tensor
@@ -468,7 +479,7 @@ class TimeDistributed(nn.Module):
         # IMPORTANT:
         #   This init has to be here so that the
         #   passed module parameters can be part of the
-        #   state (parameters) of the overall model.
+        #   state (parameters) of the whole model.
 
         super().__init__()
         self.module = module
