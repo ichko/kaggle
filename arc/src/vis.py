@@ -22,7 +22,30 @@ def normalize_board(board):
     return board.detach().cpu().numpy()
 
 
-def plot_task_inference(batch, idx, test_preds=None, size=2):
+def plot_task_inference(inputs, outputs, preds, size=2):
+    diffs = abs(outputs - preds)
+    cols, rows = 4, len(inputs)
+    fig = plt.figure(figsize=(cols * size, rows * size))
+
+    for r in range(rows):
+        for c, (col, img) in enumerate({
+                'inputs': inputs,
+                'outputs': outputs,
+                'preds': preds,
+                'diffs': diffs,
+        }.items()):
+            ax = fig.add_subplot(rows, cols, r * cols + c + 1)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(f'{col}[{r}]')
+            ax.imshow(normalize_board(img[r]), cmap=cmap)
+
+    fig.tight_layout()
+
+    return fig
+
+
+def plot_task(batch, idx, test_preds=None, size=2):
     task = {k: v[idx] for k, v in batch.items()}
     if test_preds is not None:
         task['test_preds'] = test_preds[idx]
@@ -56,14 +79,10 @@ def plot_task_inference(batch, idx, test_preds=None, size=2):
     return fig
 
 
-def plot_pictures(pictures):
-    fig, axs = plt.subplots(1, len(pictures))
-    if len(pictures) == 1:
-        axs = [axs]
+def plot_grid(grid):
+    fig, ax = plt.subplots(1, 1)
 
-    for i, pict in enumerate(pictures):
-        axs[i].imshow(pict, cmap=cmap, norm=norm)
-        axs[i].grid(True, which='both', color='lightgrey', linewidth=0.5)
-        axs[i].set_title('')
+    ax.imshow(normalize_board(grid), cmap=cmap, norm=norm)
+    # ax[i].grid(True, which='both', color='lightgrey', linewidth=0.5)
 
     return fig
