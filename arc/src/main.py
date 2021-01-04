@@ -94,8 +94,6 @@ def main(hparams):
     model.configure_optim(lr=hparams.lr)
     model.summary()
 
-    # TODO: Infer patterns with computed program on train tasks
-
     for epoch in tqdm(range(hparams.epochs)):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
         # model.set_num_iters(num_iters)
@@ -108,26 +106,35 @@ def main(hparams):
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            info['y'] = torch.argmax(info['y'], dim=2)
-            info['y_pred'] = torch.argmax(info['y_pred'], dim=2)
-
-            logger.log_info(info)
-            fig = vis.plot_task_inference(
-                batch=info['X'],
-                test_preds=info['y_pred'],
-                idx=0,
-            )
-            logger.log({'task': fig})
-
             train_score = evaluate(model, train_dl)
             val_score = evaluate(model, val_dl)
+
+            idx = 0
+            length = info['X']['infer_len'][idx]
+            inputs = info['X']['infer_inputs'][idx][:length]
+            outputs = torch.argmax(info['y'], dim=2)[idx][:length]
+            preds = torch.argmax(info['y_pred'], dim=2)[idx][:length]
+
+            logger.log({
+                'task':
+                vis.plot_task_inference(
+                    inputs=inputs,
+                    outputs=outputs,
+                    preds=preds,
+                ),
+                'train_y':
+                vis.plot_grid(outputs[0]),
+                'train_y_pred':
+                vis.plot_grid(preds[0]),
+                'train_score':
+                train_score,
+                'val_score':
+                val_score,
+            })
 
             print(f'====== EPOCH {epoch} END ======')
             print('FINAL TRAIN SCORE:', train_score)
             print('FINAL VAL SCORE:', val_score)
-
-            logger.log({'train_score': train_score})
-            logger.log({'val_score': val_score})
 
             model.persist()
 
