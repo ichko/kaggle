@@ -417,6 +417,16 @@ def spatial_transformer(i, num_channels, only_translations=False):
     return SpatialTransformer()
 
 
+def mask_seq_from_lens(tensor, lens):
+    seq_dim = 1
+    mask = torch.arange(tensor.size(seq_dim))[None, :] < lens[:, None]
+    mask = mask.reshape(*mask.shape, *([1] * (len(tensor.shape) - 2)))
+    mask = mask.expand(*tensor.shape)
+    mask = mask.to(tensor.device)
+
+    return tensor * mask
+
+
 @torch.jit.script
 def mask_sequence(tensor, mask):
     initial_shape = tensor.shape
