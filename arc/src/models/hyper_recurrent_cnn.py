@@ -154,7 +154,7 @@ class HyperRecurrentCNN(ut.Module):
 
         return result
 
-    def criterion(self, y_pred, y):
+    def criterion_(self, y_pred, y):
         bs, seq = y_pred.shape[:2]
         loss = 0
 
@@ -173,6 +173,10 @@ class HyperRecurrentCNN(ut.Module):
         return loss
 
     def optim_step(self, batch, optim_kw={}):
+        # TODO: Mask train pairs after using them for inference
+        # TODO: Check evaluation script
+        # TODO: Fix vis of tasks during optim
+
         X, y = batch
         max_train = 3
         max_test = 2
@@ -191,7 +195,7 @@ class HyperRecurrentCNN(ut.Module):
 
         y_pred = self.forward_prepared(train, test_in)
         y_pred = ut.mask_seq_from_lens(y_pred, test_len)
-        loss = self.criterion(y_pred, y_argmax)
+        loss = self.criterion_(y_pred, y_argmax)
 
         if loss.requires_grad:
             self.optim.zero_grad()
