@@ -12,6 +12,8 @@ device = 'cpu'
 # SRC - <https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks/notebook>
 # class CAModel(nn.Module):
 
+CHANNEL_DIM = 2
+
 
 class HyperConv2D(nn.Module):
     # TODO: something multiheaded would be nice!
@@ -106,13 +108,6 @@ class CA(nn.Module):
         return ut.time_distribute(solve_task, infer_inputs)
 
 
-def one_hot_channels(tensor):
-    tensor = F.one_hot(tensor.long(), num_classes=11).float()
-    # Move the one hot encoded dimension in the channel dim
-    tensor = tensor.permute(0, 1, 4, 2, 3)
-    return tensor
-
-
 class HyperRecurrentCNN(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
@@ -144,38 +139,22 @@ class HyperRecurrentCNN(ut.Module):
         )
 
     def forward(self, batch):
-        # train_inputs = one_hot_channels(batch['train_inputs'])
-        # train_outputs = one_hot_channels(batch['train_outputs'])
-        all_inputs = one_hot_channels(batch['all_inputs'])
-        all_outputs = one_hot_channels(batch['all_outputs'])
+        train_inputs = ut.one_hot(batch['train_inputs'], 11, dim=2)
+        train_outputs = ut.one_hot(batch['train_outputs'], 11, dim=2)
+        infer_inputs = ut.one_hot(batch['test_inputs'], 11, dim=2)
 
-        channel_dim = 2
-        seq_dim = 1
-        max_demos = 3
-        max_infer = 2
+        train_io = torch.cat([train_inputs, train_outputs], dim=CHANNEL_DIM)
 
-        num_demos = min(demos.size(seq_dim), max_demos)
-        num_to_infer = min(all_inputs.size(seq_dim), max_infer)
+        return self.forward_prepared(train_io, infer_inputs)
 
-        demos = torch.cat([all_inputs, all_outputs], dim=channel_dim)
-        demos = ut.sample_dim(demos, n=num_demos, dim=seq_dim)
-
-        task_features = self.task_feature_extract(demos)
-        infer = ut.sample_dim(all_inputs, n=num_to_infer, dim=seq_dim)
-        result = self.ca(task_features, infer, self.num_iters)
+    def forward_prepared(self, train_io, infer_inputs):
+        task_features = self.task_feature_extract(train_io)
+        result = self.ca(task_features, infer_inputs, self.num_iters)
         self.task_features = task_features  # Save to return as info param
 
         return result
 
-    def optim_step(self, batch, optim_kw={}):
-        X, y = batch
-        y = one_hot_channels(y)
-
-        channel_dim = 2
-        y_argmax = torch.argmax(y, dim=channel_dim)
-        y_pred = self.forward(X)
-        y_pred = ut.mask_seq_from_lens(y_pred, X['all_len'])
-
+    def criterion(self, y_pred, y):
         bs, seq = y_pred.shape[:2]
         loss = 0
 
@@ -186,10 +165,33 @@ class HyperRecurrentCNN(ut.Module):
             weights_sum += weight
             loss += F.nll_loss(
                 input=y_pred[:, :, i].reshape(bs * seq, *y_pred.shape[-3:]),
-                target=y_argmax.reshape(bs * seq, *y_argmax.shape[-2:]),
+                target=y.reshape(bs * seq, *y.shape[-2:]),
             ) * weight
 
         loss /= weights_sum
+
+        return loss
+
+    def optim_step(self, batch, optim_kw={}):
+        X, y = batch
+        max_train = 3
+        max_test = 2
+
+        lens = X['all_len']
+        all_in = ut.one_hot(X['all_inputs'], num_classes=11, dim=CHANNEL_DIM)
+        all_out = ut.one_hot(X['all_outputs'], num_classes=11, dim=CHANNEL_DIM)
+        pairs = torch.cat([all_in, all_out], dim=CHANNEL_DIM)
+
+        train, _train_len = ut.sample_padded_sequences(pairs, lens, max_train)
+        test, test_len = ut.sample_padded_sequences(pairs, lens, max_test)
+
+        test_in, test_out = test.chunk(2, dim=CHANNEL_DIM)
+
+        y_argmax = torch.argmax(test_out, dim=CHANNEL_DIM)
+
+        y_pred = self.forward_prepared(train, test_in)
+        y_pred = ut.mask_seq_from_lens(y_pred, test_len)
+        loss = self.criterion(y_pred, y_argmax)
 
         if loss.requires_grad:
             self.optim.zero_grad()
@@ -200,7 +202,6 @@ class HyperRecurrentCNN(ut.Module):
             'X': X,
             'y': y,
             'y_pred': y_pred[:, :, -1],
-            'task_features': self.task_features,
         }
 
 
