@@ -110,8 +110,8 @@ def main(hparams):
             val_score = evaluate(model, val_dl)
 
             idx = 0
-            length = info['X']['infer_len'][idx]
-            inputs = info['X']['infer_inputs'][idx][:length]
+            length = info['X']['all_len'][idx]
+            inputs = info['X']['all_inputs'][idx][:length]
             outputs = torch.argmax(info['y'], dim=2)[idx][:length]
             preds = torch.argmax(info['y_pred'], dim=2)[idx][:length]
 

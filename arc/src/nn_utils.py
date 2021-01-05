@@ -417,6 +417,11 @@ def spatial_transformer(i, num_channels, only_translations=False):
     return SpatialTransformer()
 
 
+def sample_dim(tensor, n, dim):
+    index = torch.randperm(n).to(tensor.device)
+    return tensor.index_select(dim=dim, index=index)
+
+
 def mask_seq_from_lens(tensor, lens):
     seq_dim = 1
     mask = torch.arange(tensor.size(seq_dim))[None, :] < lens[:, None]

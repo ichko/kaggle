@@ -163,9 +163,9 @@ def load_data(path, bs, shuffle, device='cpu'):
                 test_outputs=test_out,
                 test_len=test_len,
                 #
-                infer_inputs=all_in,
-                infer_outputs=all_out,
-                infer_len=all_len,
+                all_inputs=all_in,
+                all_outputs=all_out,
+                all_len=all_len,
             ), all_out,
 
     dl = td.DataLoader(
