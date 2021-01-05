@@ -144,28 +144,37 @@ class HyperRecurrentCNN(ut.Module):
         )
 
     def forward(self, batch):
-        train_inputs = one_hot_channels(batch['train_inputs'])
-        train_outputs = one_hot_channels(batch['train_outputs'])
-        infer_inputs = one_hot_channels(batch['infer_inputs'])
+        # train_inputs = one_hot_channels(batch['train_inputs'])
+        # train_outputs = one_hot_channels(batch['train_outputs'])
+        all_inputs = one_hot_channels(batch['all_inputs'])
+        all_outputs = one_hot_channels(batch['all_outputs'])
 
         channel_dim = 2
-        train_io = torch.cat([train_inputs, train_outputs], dim=channel_dim)
+        seq_dim = 1
+        max_demos = 3
+        max_infer = 2
 
-        task_features = self.task_feature_extract(train_io)
-        result = self.ca(task_features, infer_inputs, self.num_iters)
+        num_demos = min(demos.size(seq_dim), max_demos)
+        num_to_infer = min(all_inputs.size(seq_dim), max_infer)
+
+        demos = torch.cat([all_inputs, all_outputs], dim=channel_dim)
+        demos = ut.sample_dim(demos, n=num_demos, dim=seq_dim)
+
+        task_features = self.task_feature_extract(demos)
+        infer = ut.sample_dim(all_inputs, n=num_to_infer, dim=seq_dim)
+        result = self.ca(task_features, infer, self.num_iters)
         self.task_features = task_features  # Save to return as info param
 
         return result
 
     def optim_step(self, batch, optim_kw={}):
-        # TODO: Remove padded predictions
         X, y = batch
         y = one_hot_channels(y)
 
         channel_dim = 2
         y_argmax = torch.argmax(y, dim=channel_dim)
         y_pred = self.forward(X)
-        y_pred = ut.mask_seq_from_lens(y_pred, X['infer_len'])
+        y_pred = ut.mask_seq_from_lens(y_pred, X['all_len'])
 
         bs, seq = y_pred.shape[:2]
         loss = 0
