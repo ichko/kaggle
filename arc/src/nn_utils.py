@@ -417,9 +417,46 @@ def spatial_transformer(i, num_channels, only_translations=False):
     return SpatialTransformer()
 
 
-def sample_dim(tensor, n, dim):
-    index = torch.randperm(n).to(tensor.device)
+def one_hot(tensor, num_classes, dim):
+    tensor = F.one_hot(tensor.long(), num_classes=num_classes).float()
+    new_shape = list(tensor.shape)
+    # Place last dim (one-hot) on the desired position
+    val = new_shape.pop()
+    new_shape.insert(dim, val)
+    # Move the one hot encoded dimension in the channel dim
+    tensor = tensor.permute(0, 1, 4, 2, 3)
+
+    return tensor
+
+
+def sample_dim(tensor, n, dim, dim_size=None):
+    if dim_size is None:
+        dim_size = tensor.size(dim)
+
+    index = torch.randperm(dim_size).to(tensor.device)
+    index = index[:n]
     return tensor.index_select(dim=dim, index=index)
+
+
+def sample_padded_sequences(sequences, lens, sample_size):
+    seq_dim = 1
+
+    new_shape = list(sequences.shape)
+    new_shape[seq_dim] = sample_size
+
+    data = torch.zeros(new_shape).to(sequences.device)
+    new_lens = torch.zeros_like(lens).to(lens.device)
+
+    for i, (length, seq) in enumerate(zip(lens, sequences)):
+        new_lens[i] = min(length, sample_size)
+        data[i] = sample_dim(
+            seq,
+            n=new_lens[i],
+            dim=0,
+            dim_size=length,
+        )
+
+    return data, new_lens
 
 
 def mask_seq_from_lens(tensor, lens):
