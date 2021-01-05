@@ -165,6 +165,7 @@ class HyperRecurrentCNN(ut.Module):
         channel_dim = 2
         y_argmax = torch.argmax(y, dim=channel_dim)
         y_pred = self.forward(X)
+        y_pred = ut.mask_seq_from_lens(y_pred, X['infer_len'])
 
         bs, seq = y_pred.shape[:2]
         loss = 0

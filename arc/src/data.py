@@ -115,7 +115,7 @@ def load_data(path, bs, shuffle, device='cpu'):
     data = normalize_obj(data)
     tasks = list(data.values())
 
-    max_train_pairs = 8  # demonstrations are padded to this
+    max_train_pairs = 4  # demonstrations are padded to this
     max_test_pairs = 1
     num_colors = 11  # each color + one id for border
     seq_dim = 0
