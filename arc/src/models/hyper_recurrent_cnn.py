@@ -37,11 +37,12 @@ class HyperConv2D(nn.Module):
 
     def infer_params(self, task_features, infer_inputs):
         def forward_single_task(features):
-            rep_dims_w = [features.shape[0], *([1] * len(self.weights.shape))]
-            rep_dims_b = [features.shape[0], *([1] * len(self.bias.shape))]
+            bs = features.size(0)
 
-            batched_conv_w = self.weights.unsqueeze(0).repeat(*rep_dims_w)
-            batched_conv_b = self.bias.unsqueeze(0).repeat(*rep_dims_b)
+            batched_conv_w = self.weights.unsqueeze(0)
+            batched_conv_w = batched_conv_w.expand(bs, *self.weights.shape)
+            batched_conv_b = self.bias.unsqueeze(0)
+            batched_conv_b = batched_conv_b.expand(bs, *self.bias.shape)
 
             features_for_w = features.unsqueeze(2).unsqueeze(2) \
                                      .unsqueeze(2).unsqueeze(2)
@@ -96,6 +97,7 @@ class CA(nn.Module):
         def solve_task(x):
             seq = []
             for _i in range(num_iters):
+                # TODO: Do inference in latent space
                 x = self.conv_1(x)
                 x = self.bn_1(x)
                 x = F.leaky_relu(x, negative_slope=0.5)
@@ -174,7 +176,6 @@ class HyperRecurrentCNN(ut.Module):
 
     def optim_step(self, batch, optim_kw={}):
         # TODO: Mask train pairs after using them for inference
-        # TODO: Check evaluation script
 
         X, y = batch
         max_train = 3

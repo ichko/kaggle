@@ -26,7 +26,7 @@ def evaluate(model, dataloader):
             "The shapes of y and y_pred should match!!!"
 
         task_error = 1
-        if torch.all(y_hat == y).item():
+        if torch.all(y_hat.int() == y.int()).item():
             task_error = 0
 
         error += task_error
