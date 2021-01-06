@@ -447,14 +447,16 @@ def sample_padded_sequences(sequences, lens, sample_size):
     data = torch.zeros(new_shape).to(sequences.device)
     new_lens = torch.zeros_like(lens).to(lens.device)
 
+    # TODO: Make this vector operation if possible!
     for i, (length, seq) in enumerate(zip(lens, sequences)):
         new_lens[i] = min(length, sample_size)
-        data[i] = sample_dim(
+        sample = sample_dim(
             seq,
             n=new_lens[i],
             dim=0,
             dim_size=length,
         )
+        data[i, :len(sample)] = sample
 
     return data, new_lens
 

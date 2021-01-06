@@ -190,6 +190,7 @@ class HyperRecurrentCNN(ut.Module):
         test, test_len = ut.sample_padded_sequences(pairs, lens, max_test)
 
         test_in, test_out = test.chunk(2, dim=CHANNEL_DIM)
+        train_in, train_out = train.chunk(2, dim=CHANNEL_DIM)
 
         y_argmax = torch.argmax(test_out, dim=CHANNEL_DIM)
 
@@ -205,7 +206,10 @@ class HyperRecurrentCNN(ut.Module):
         return loss.item(), {
             'X': X,
             'y': y,
-            'y_pred': y_pred[:, :, -1],
+            'test_len': test_len,
+            'test_inputs': test_in.argmax(dim=CHANNEL_DIM),
+            'test_outputs': y_argmax,
+            'test_preds': y_pred[:, :, -1].argmax(dim=CHANNEL_DIM),
         }
 
 

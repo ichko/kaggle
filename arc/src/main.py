@@ -109,28 +109,28 @@ def main(hparams):
             train_score = evaluate(model, train_dl)
             val_score = evaluate(model, val_dl)
 
-            # idx = 0
-            # length = info['X']['infer_len'][idx]
-            # inputs = info['X']['infer_inputs'][idx][:length]
-            # outputs = torch.argmax(info['y'], dim=2)[idx][:length]
-            # preds = torch.argmax(info['y_pred'], dim=2)[idx][:length]
+            idx = 0
+            length = info['test_len'][idx]
+            inputs = info['test_inputs'][idx, :length]
+            outputs = info['test_outputs'][idx, :length]
+            preds = info['test_preds'][idx, :length]
 
-            # logger.log({
-            #     'task':
-            #     vis.plot_task_inference(
-            #         inputs=inputs,
-            #         outputs=outputs,
-            #         preds=preds,
-            #     ),
-            #     'train_y':
-            #     vis.plot_grid(outputs[0]),
-            #     'train_y_pred':
-            #     vis.plot_grid(preds[0]),
-            #     'train_score':
-            #     train_score,
-            #     'val_score':
-            #     val_score,
-            # })
+            logger.log({
+                'task':
+                vis.plot_task_inference(
+                    inputs=inputs,
+                    outputs=outputs,
+                    preds=preds,
+                ),
+                'train_y':
+                vis.plot_grid(outputs[0]),
+                'train_y_pred':
+                vis.plot_grid(preds[0]),
+                'train_score':
+                train_score,
+                'val_score':
+                val_score,
+            })
 
             print(f'====== EPOCH {epoch} END ======')
             print('FINAL TRAIN SCORE:', train_score)
