@@ -117,7 +117,7 @@ class HyperRecurrentCNN(ut.Module):
         num_hyper_kernels = 64
         self.num_iters = num_iters
 
-        self.task_feature_extract = nn.Sequential(
+        self.task_feature_extract = ut.time_distribute(nn.Sequential(
             ut.conv_block(
                 i=input_channels * 2, o=128, ks=5, s=2, p=2, \
                 a=ut.leaky(),
@@ -129,9 +129,7 @@ class HyperRecurrentCNN(ut.Module):
             ut.Reshape(-1, 128),
             nn.Linear(128, num_hyper_kernels),
             nn.Softmax(dim=1),
-        )
-        self.task_feature_extract = ut.time_distribute(
-            self.task_feature_extract)
+        ))
 
         self.ca = CA(
             num_hyper_kernels=num_hyper_kernels,
@@ -142,9 +140,7 @@ class HyperRecurrentCNN(ut.Module):
         train_inputs = ut.one_hot(batch['train_inputs'], 11, dim=2)
         train_outputs = ut.one_hot(batch['train_outputs'], 11, dim=2)
         infer_inputs = ut.one_hot(batch['test_inputs'], 11, dim=2)
-
         train_io = torch.cat([train_inputs, train_outputs], dim=CHANNEL_DIM)
-
         preds = self.forward_prepared(train_io, infer_inputs)
 
         return preds[:, :, -1].argmax(dim=CHANNEL_DIM)
@@ -163,8 +159,10 @@ class HyperRecurrentCNN(ut.Module):
         seq_dims = list(range(3, y_pred.size(2)))
         weights_sum = 0
         for i in seq_dims:
-            weight = ((i - seq_dims[0]) / (len(seq_dims) - seq_dims[0] - 1))**2
+            weight = (i - seq_dims[0]) / (len(seq_dims) - seq_dims[0] - 1)
+            weight = weight**2
             weights_sum += weight
+
             loss += F.nll_loss(
                 input=y_pred[:, :, i].reshape(bs * seq, *y_pred.shape[-3:]),
                 target=y.reshape(bs * seq, *y.shape[-2:]),
