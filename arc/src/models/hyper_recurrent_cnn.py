@@ -145,7 +145,9 @@ class HyperRecurrentCNN(ut.Module):
 
         train_io = torch.cat([train_inputs, train_outputs], dim=CHANNEL_DIM)
 
-        return self.forward_prepared(train_io, infer_inputs)
+        preds = self.forward_prepared(train_io, infer_inputs)
+
+        return preds[:, :, -1].argmax(dim=CHANNEL_DIM)
 
     def forward_prepared(self, train_io, infer_inputs):
         task_features = self.task_feature_extract(train_io)
@@ -175,7 +177,6 @@ class HyperRecurrentCNN(ut.Module):
     def optim_step(self, batch, optim_kw={}):
         # TODO: Mask train pairs after using them for inference
         # TODO: Check evaluation script
-        # TODO: Fix vis of tasks during optim
 
         X, y = batch
         max_train = 3
@@ -190,7 +191,6 @@ class HyperRecurrentCNN(ut.Module):
         test, test_len = ut.sample_padded_sequences(pairs, lens, max_test)
 
         test_in, test_out = test.chunk(2, dim=CHANNEL_DIM)
-        train_in, train_out = train.chunk(2, dim=CHANNEL_DIM)
 
         y_argmax = torch.argmax(test_out, dim=CHANNEL_DIM)
 

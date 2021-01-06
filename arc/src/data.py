@@ -139,7 +139,6 @@ def load_data(path, bs, shuffle, device='cpu'):
             return len(tasks)
 
         def __getitem__(self, id):
-            # TODO: Vary the paris which are used to do param inference
             train_in, train_len = get(['train', 'input'], id, max_train_pairs)
             train_out, _ = get(['train', 'output'], id, max_train_pairs)
             test_in, test_len = get(['test', 'input'], id, max_test_pairs)
@@ -166,7 +165,7 @@ def load_data(path, bs, shuffle, device='cpu'):
                 all_inputs=all_in,
                 all_outputs=all_out,
                 all_len=all_len,
-            ), all_out,
+            ), test_out,
 
     dl = td.DataLoader(
         Dataset(),

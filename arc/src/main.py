@@ -21,10 +21,12 @@ def evaluate(model, dataloader):
     for X, y in tqdm(dataloader):
         # Currently outputting single prediction per test input
         y_hat = model(X)
-        y_hat = (y_hat > 0.5).float()
+
+        assert y_hat.shape == y.shape, \
+            "The shapes of y and y_pred should match!!!"
 
         task_error = 1
-        if y_hat.shape == y.shape and torch.all(y_hat == y).item():
+        if torch.all(y_hat == y).item():
             task_error = 0
 
         error += task_error
