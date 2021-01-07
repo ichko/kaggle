@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import src.nn_utils as ut
-from src.models.hyper_conv import HyperConv2D
+from src.models.soft_picking_hyper_conv import HyperConv2D
 
 CHANNEL_DIM = 2
 
