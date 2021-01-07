@@ -81,31 +81,59 @@ class HyperConv2D(nn.Module):
 
 
 class CA(nn.Module):
-    def __init__(self, num_hyper_kernels, input_channels):
+    def __init__(self, num_kernels, in_channels, latent_space_inference):
         super().__init__()
-        self.conv_1 = HyperConv2D(
-            (num_hyper_kernels, 64, input_channels, 3, 3))
-        self.bn_1 = nn.BatchNorm2d(64)
+        self.latent_space_inference = latent_space_inference
 
-        self.conv_2 = HyperConv2D(
-            (num_hyper_kernels, input_channels, 64, 3, 3))
+        num_hidden = in_channels
+        if latent_space_inference:
+            num_hidden = 32
+            self.encode = ut.conv_block(
+                i=in_channels,
+                o=num_hidden,
+                ks=5,
+                s=1,
+                p=2,
+                a=nn.Softmax(dim=1),
+            )
+
+            self.decode = ut.conv_block(
+                i=num_hidden,
+                o=in_channels,
+                ks=5,
+                s=1,
+                p=2,
+                a=nn.Softmax(dim=1),
+            )
+
+        self.conv_1 = HyperConv2D((num_kernels, 64, num_hidden, 3, 3))
+        self.bn_1 = nn.BatchNorm2d(64)
+        self.conv_2 = HyperConv2D((num_kernels, num_hidden, 64, 3, 3))
 
     def forward(self, task_features, infer_inputs, num_iters):
         self.conv_1.infer_params(task_features, infer_inputs)
         self.conv_2.infer_params(task_features, infer_inputs)
 
         def solve_task(x):
-            seq = []
-            for _i in range(num_iters):
-                # TODO: Do inference in latent space
+            if self.latent_space_inference:
+                x = self.encode(x)
+
+            seq_shape = list(x.shape)
+            seq_shape.insert(1, num_iters)
+            seq = torch.zeros(seq_shape).to(x.device)
+
+            for i in range(num_iters):
                 x = self.conv_1(x)
                 x = self.bn_1(x)
                 x = F.leaky_relu(x, negative_slope=0.5)
                 x = self.conv_2(x)
                 x = torch.softmax(x, dim=1)
-                seq.append(x.clone().unsqueeze(1))
+                seq[:, i] = x
 
-            return torch.log(torch.cat(seq, dim=1))
+            if self.latent_space_inference:
+                seq = ut.time_distribute(self.decode, seq)
+
+            return torch.log(seq)
 
         return ut.time_distribute(solve_task, infer_inputs)
 
@@ -114,7 +142,7 @@ class HyperRecurrentCNN(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
 
-    def __init__(self, input_channels, num_iters):
+    def __init__(self, input_channels, num_iters, latent_space_inference):
         super().__init__()
         num_hyper_kernels = 64
         self.num_iters = num_iters
@@ -134,8 +162,9 @@ class HyperRecurrentCNN(ut.Module):
         ))
 
         self.ca = CA(
-            num_hyper_kernels=num_hyper_kernels,
-            input_channels=input_channels,
+            num_kernels=num_hyper_kernels,
+            in_channels=input_channels,
+            latent_space_inference=latent_space_inference,
         )
 
     def forward(self, batch):
@@ -216,6 +245,7 @@ def make_model(hparams):
     return HyperRecurrentCNN(
         input_channels=hparams['input_channels'],
         num_iters=hparams['nca_iterations'],
+        latent_space_inference=hparams['latent_space_inference'],
     )
 
 
