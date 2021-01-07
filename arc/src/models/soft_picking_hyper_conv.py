@@ -10,14 +10,17 @@ import src.nn_utils as ut
 class HyperConv2D(nn.Module):
     # TODO: something multiheaded would be nice!
 
-    def __init__(self, shape):
+    def __init__(self, num_kernels, i, o, ks, s=1, p=0, a=None):
         super().__init__()
-
-        self.weights = nn.Parameter(torch.Tensor(*shape))
-        nn.init.kaiming_uniform_(self.weights, a=math.sqrt(5))
+        self.s = s
+        self.p = p
+        self.a = a
 
         # Taken from the src code of nn.ConvND
-        self.bias = nn.Parameter(torch.Tensor(*shape[:2]))
+        self.weights = nn.Parameter(torch.Tensor(num_kernels, o, i, ks, ks))
+        nn.init.kaiming_uniform_(self.weights, a=math.sqrt(5))
+
+        self.bias = nn.Parameter(torch.Tensor(num_kernels, o))
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weights[0])
         bound = 1 / math.sqrt(fan_in)
         nn.init.uniform_(self.bias, -bound, bound)
@@ -27,8 +30,8 @@ class HyperConv2D(nn.Module):
 
         self.layer_params = None
 
-    def infer_params(self, task_features, infer_inputs):
-        def forward_single_task(features):
+    def infer_params(self, batch_of_features, infer_inputs):
+        def infer_params(features):
             bs = features.size(0)
 
             batched_conv_w = self.weights.unsqueeze(0)
@@ -48,7 +51,7 @@ class HyperConv2D(nn.Module):
 
             return sum_weighted_w, sum_weighted_b
 
-        w, b = ut.time_distribute(forward_single_task, task_features)
+        w, b = ut.time_distribute(infer_params, batch_of_features)
 
         # TODO: This should be changed to something more expressive.
         # Now we just avg across demonstrations.
@@ -69,4 +72,9 @@ class HyperConv2D(nn.Module):
             raise Exception('Params are not yet inferred!')
 
         w, b = self.layer_params
-        return ut.batch_conv(x, w, b, p=1)
+        out = ut.batch_conv(x, w, b, p=self.p, s=self.s)
+
+        if self.a is not None:
+            out = self.a(out)
+
+        return out

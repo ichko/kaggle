@@ -34,9 +34,9 @@ class CA(nn.Module):
                 a=nn.Softmax(dim=1),
             )
 
-        self.conv_1 = HyperConv2D((num_kernels, 64, num_hidden, 3, 3))
+        self.conv_1 = HyperConv2D(num_kernels, i=num_hidden, o=64, ks=3, p=1)
         self.bn_1 = nn.BatchNorm2d(64)
-        self.conv_2 = HyperConv2D((num_kernels, num_hidden, 64, 3, 3))
+        self.conv_2 = HyperConv2D(num_kernels, i=64, o=num_hidden, ks=3, p=1)
 
     def forward(self, task_features, infer_inputs, num_iters):
         self.conv_1.infer_params(task_features, infer_inputs)
