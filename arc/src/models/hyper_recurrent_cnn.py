@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import src.nn_utils as ut
-from src.models.soft_picking_hyper_conv import HyperConv2D
+from src.models.soft_layer_hyper_conv import SoftLayerConv2D
+from src.models.soft_kernel_hyper_conv import SoftKernelConv2D
 
 CHANNEL_DIM = 2
 
@@ -25,18 +26,25 @@ class CA(nn.Module):
                 a=nn.Softmax(dim=1),
             )
 
-            self.decode = ut.conv_block(
-                i=num_hidden,
-                o=in_channels,
-                ks=5,
-                s=1,
-                p=2,
-                a=nn.Softmax(dim=1),
+            self.decode = ut.conv_block( \
+                i=num_hidden, o=in_channels, \
+                ks=5, s=1, p=2, a=nn.Softmax(dim=1),
             )
 
-        self.conv_1 = HyperConv2D(num_kernels, i=num_hidden, o=64, ks=3, p=1)
+        self.conv_1 = SoftKernelConv2D( \
+            features_size=num_kernels, num_kernels=32,
+            i=num_hidden, o=64, ks=3, p=1,
+        )
+        self.conv_2 = SoftKernelConv2D( \
+            features_size=num_kernels, num_kernels=32,
+            i=64, o=num_hidden, ks=3, p=1,
+        )
+        # self.conv_1 = \
+        #     SoftLayerConv2D(num_kernels, i=num_hidden, o=64, ks=3, p=1)
+        # self.conv_2 = \
+        #     SoftLayerConv2D(num_kernels, i=64, o=num_hidden, ks=3, p=1)
+
         self.bn_1 = nn.BatchNorm2d(64)
-        self.conv_2 = HyperConv2D(num_kernels, i=64, o=num_hidden, ks=3, p=1)
 
     def forward(self, task_features, infer_inputs, num_iters):
         self.conv_1.infer_params(task_features, infer_inputs)
@@ -86,7 +94,6 @@ class HyperRecurrentCNN(ut.Module):
             ut.conv_block(i=64, o=128, ks=2, s=1, p=0, a=ut.leaky()),
             ut.Reshape(-1, 128),
             nn.Linear(128, num_hyper_kernels),
-            nn.Softmax(dim=1),
         ))
 
         self.ca = CA(
