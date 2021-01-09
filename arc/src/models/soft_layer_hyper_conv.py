@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import src.nn_utils as ut
 
 
-class HyperConv2D(nn.Module):
+class SoftLayerConv2D(nn.Module):
     # TODO: something multiheaded would be nice!
 
     def __init__(self, num_kernels, i, o, ks, s=1, p=0, a=None):
@@ -32,6 +32,7 @@ class HyperConv2D(nn.Module):
 
     def infer_params(self, batch_of_features, infer_inputs):
         def infer_params(features):
+            features = torch.softmax(features, dim=1)
             bs = features.size(0)
 
             batched_conv_w = self.weights.unsqueeze(0)
