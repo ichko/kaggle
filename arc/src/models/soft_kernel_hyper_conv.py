@@ -61,13 +61,10 @@ class SoftKernelConv2D(nn.Module):
 
             return soft_w, soft_b
 
-        w, b = ut.time_distribute(infer_params, batch_of_features)
-
         # TODO: This should be changed to something more expressive.
         # Now we just avg across demonstrations.
-        # TODO: AVG THE FEATURES INSTEAD OF THE WEIGHTS
-        w = torch.mean(w, dim=1)
-        b = torch.mean(b, dim=1)
+        features = torch.mean(batch_of_features, dim=1)
+        w, b = infer_params(features)
 
         num_inference_pairs = infer_inputs.size(1)
         w = ut.unsqueeze_expand(w, dim=1, times=num_inference_pairs)
