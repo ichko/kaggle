@@ -499,6 +499,13 @@ def prepare_rnn_state(state, num_rnn_layers):
     )
 
 
+def unsqueeze_like(src, target):
+    diff = len(target.shape) - len(src.shape)
+
+    if diff <= 0: return src
+    return src[(..., ) + (None, ) * diff]
+
+
 def time_distribute(module, input=None):
     """
     Distribute execution of module over batched sequential input tensor.
