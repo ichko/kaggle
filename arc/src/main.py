@@ -16,22 +16,25 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
 # AVG TOP 3 for each task (less is better)
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, num_iters):
     error = 0
-    for X, y in tqdm(dataloader):
+    length = 0
+    for X, y_batch in tqdm(dataloader):
         # Currently outputting single prediction per test input
-        y_hat = model(X)
+        y_hat_batch = model(X, num_iters)
 
-        assert y_hat.shape == y.shape, \
-            "The shapes of y and y_pred should match!!!"
+        for y, y_hat in zip(y_batch, y_hat_batch):
+            length += 1
+            assert y_hat.shape == y.shape, \
+                "The shapes of y and y_pred should match!!!"
 
-        task_error = 1
-        if torch.all(y_hat.int() == y.int()).item():
-            task_error = 0
+            task_error = 1
+            if torch.all(y_hat.int() == y.int()).item():
+                task_error = 0
 
-        error += task_error
+            error += task_error
 
-    return error / len(dataloader)
+    return error / length
 
 
 def get_model(hparams):
@@ -71,7 +74,7 @@ def main(hparams):
 
     val_dl = data.load_data(
         '.data/evaluation',
-        bs=5,
+        bs=hparams.bs,
         shuffle=False,
         device=DEVICE,
     )
@@ -86,7 +89,7 @@ def main(hparams):
         type='image',
     )
 
-    if 'from_scratch' in sys.argv:
+    if 'from_scratch' not in sys.argv:
         try:
             model.preload_weights()
             print('>>> MODEL PRELOADED')
@@ -102,14 +105,15 @@ def main(hparams):
 
         tq_batches = tqdm(train_dl)
         for idx, batch in enumerate(tq_batches):
+            # with ef.scan(wait=i == 0):
             loss, info = model.optim_step(batch)
 
             tq_batches.set_description(f'Loss: {loss:.6f}')
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            train_score = evaluate(model, train_dl)
-            val_score = evaluate(model, val_dl)
+            train_score = evaluate(model, train_dl, hparams.nca_iterations)
+            val_score = evaluate(model, val_dl, hparams.nca_iterations)
 
             idx = 0
             length = info['test_len'][idx]
@@ -149,7 +153,7 @@ if __name__ == '__main__':
         '--config',
         help='id of configuration',
     )
-    # parser.add_argument('--from-scratch', action='store_false')
+    parser.add_argument('--from-scratch', action='store_false')
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
