@@ -54,14 +54,6 @@ def main(hparams):
     import sys
     from tqdm import tqdm
 
-    print('DEVICE:', DEVICE)
-    print(f'## Start training with configuration "{hparams.model.upper()}"')
-
-    if not utils.IS_DEBUG:
-        print('\n\nPress ENTER to continue')
-        _ = input()
-        print('...')
-
     pp = pprint.PrettyPrinter(4)
     pp.pprint(vars(hparams))
 
@@ -82,22 +74,32 @@ def main(hparams):
     model = get_model(hparams)
     model = model.to(DEVICE)
 
+    if '--from-scratch' not in sys.argv:
+        try:
+            model.preload_weights()
+            print('>>> MODEL PRELOADED')
+        except Exception as e:
+            raise Exception(f'>>> Could not preload! {str(e)}')
+    else:
+        print('>>> TRAINING MODEL FROM SCRATCH!')
+
+    model.configure_optim(lr=hparams.lr)
+    model.summary()
+
+    print('DEVICE:', DEVICE)
+    print(f'## Start training with configuration "{hparams.model.upper()}"')
+
+    if not utils.IS_DEBUG:
+        print('\n\nPress ENTER to continue')
+        _ = input()
+        print('...')
+
     logger = loggers.WAndB(
         name=hparams.model,
         model=model,
         hparams=hparams,
         type='image',
     )
-
-    if 'from_scratch' not in sys.argv:
-        try:
-            model.preload_weights()
-            print('>>> MODEL PRELOADED')
-        except Exception as e:
-            raise Exception(f'>>> Could not preload! {str(e)}')
-
-    model.configure_optim(lr=hparams.lr)
-    model.summary()
 
     for epoch in tqdm(range(hparams.epochs)):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
