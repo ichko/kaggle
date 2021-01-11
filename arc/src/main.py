@@ -19,6 +19,8 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 def evaluate(model, dataloader, num_iters):
     error = 0
     length = 0
+    num_solved = 0
+
     for X, y_batch in tqdm(dataloader):
         # Currently outputting single prediction per test input
         y_hat_batch = model(X, num_iters)
@@ -28,13 +30,12 @@ def evaluate(model, dataloader, num_iters):
             assert y_hat.shape == y.shape, \
                 "The shapes of y and y_pred should match!!!"
 
-            task_error = 1
             if torch.all(y_hat.int() == y.int()).item():
-                task_error = 0
+                num_solved += 1
+            else:
+                error += 1
 
-            error += task_error
-
-    return error / length
+    return error / length, num_solved
 
 
 def get_model(hparams):
@@ -101,6 +102,9 @@ def main(hparams):
         type='image',
     )
 
+    # Summary for the logger
+    model.summary()
+
     for epoch in tqdm(range(hparams.epochs)):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
         # model.set_num_iters(num_iters)
@@ -114,8 +118,10 @@ def main(hparams):
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            train_score = evaluate(model, train_dl, hparams.nca_iterations)
-            val_score = evaluate(model, val_dl, hparams.nca_iterations)
+            train_score, train_solved = evaluate(model, train_dl,
+                                                 hparams.nca_iterations)
+            val_score, val_solved = evaluate(model, val_dl,
+                                             hparams.nca_iterations)
 
             idx = 0
             length = info['test_len'][idx]
@@ -130,14 +136,15 @@ def main(hparams):
                     outputs=outputs,
                     preds=preds,
                 ),
-                'train_y':
-                vis.plot_grid(outputs[0]),
-                'train_y_pred':
-                vis.plot_grid(preds[0]),
-                'train_score':
-                train_score,
-                'val_score':
-                val_score,
+            })
+
+            logger.log({
+                'train_y': vis.plot_grid(outputs[0]),
+                'train_y_pred': vis.plot_grid(preds[0]),
+                'train_score': train_score,
+                'val_score': val_score,
+                'train_solved': train_solved,
+                'val_solved': val_solved,
             })
 
             print(f'====== EPOCH {epoch} END ======')
