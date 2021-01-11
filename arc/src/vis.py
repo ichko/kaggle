@@ -15,6 +15,7 @@ norm = colors.Normalize(vmin=0, vmax=len(pallet))
 
 # TODO: Show distrib of different tasks kernel picking vectors
 # TODO: Plot difference between different kernels
+# TODO: Visualize solutions with a gif
 
 
 def normalize_board(board):

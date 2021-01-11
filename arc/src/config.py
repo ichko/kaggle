@@ -1,16 +1,17 @@
 from argparse import Namespace
 
 defaults = dict(
-    eval_interval=50,
+    eval_interval=5,
     lr=0.00005,
     epochs=1_000_000,
-    bs=8,
+    bs=20,
 )
 
+# TODO: Infer in latent space
 configs = dict(
     hyper_recurrent_cnn=dict(
         model='hyper_recurrent_cnn',
-        nca_iterations=50,
+        nca_iterations=20,
         input_channels=11,
         latent_space_inference=False,
     ),

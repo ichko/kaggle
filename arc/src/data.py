@@ -27,7 +27,7 @@ def load_folder(path):
     result = dict()
 
     file_names = os.listdir(path)
-    file_names = file_names[:8]
+    # file_names = file_names[:8]
 
     if utils.IS_DEBUG:
         # load only 10 files in debug mode
