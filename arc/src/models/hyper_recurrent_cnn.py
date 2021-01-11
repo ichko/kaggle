@@ -33,19 +33,19 @@ class CA(nn.Module):
 
         # TODO: Write transformer indexing soft kernels Conv2D
         self.conv_1 = SoftKernelConv2D( \
-            features_size=features, num_kernels=128,
-            i=num_hidden, o=32, ks=3, p=1,
+            features_size=features, num_kernels=256,
+            i=num_hidden, o=64, ks=3, p=1,
         )
         self.conv_2 = SoftKernelConv2D( \
-            features_size=features, num_kernels=128,
-            i=32, o=num_hidden, ks=3, p=1,
+            features_size=features, num_kernels=256,
+            i=64, o=num_hidden, ks=3, p=1,
         )
         # self.conv_1 = \
         #     SoftLayerConv2D(num_kernels, i=num_hidden, o=64, ks=3, p=1)
         # self.conv_2 = \
         #     SoftLayerConv2D(num_kernels, i=64, o=num_hidden, ks=3, p=1)
 
-        self.bn_1 = nn.BatchNorm2d(32)
+        self.bn_1 = nn.BatchNorm2d(64)
 
     def forward(self, task_features, infer_inputs, num_iters):
         self.conv_1.infer_params(task_features, infer_inputs)
@@ -90,8 +90,8 @@ class HyperRecurrentCNN(ut.Module):
                 a=ut.leaky(),
             ),
             ut.conv_block(i=128, o=128, ks=5, s=2, p=2, a=ut.leaky()),
+            ut.conv_block(i=128, o=128, ks=5, s=2, p=2, a=ut.leaky()),
             ut.conv_block(i=128, o=64, ks=5, s=2, p=2, a=ut.leaky()),
-            ut.conv_block(i=64, o=64, ks=5, s=2, p=2, a=ut.leaky()),
             ut.conv_block(i=64, o=128, ks=2, s=1, p=0, a=ut.leaky()),
             ut.Reshape(-1, 128),
             nn.Linear(128, features),
@@ -120,21 +120,20 @@ class HyperRecurrentCNN(ut.Module):
         return result
 
     def criterion_(self, y_pred, y):
-        bs, seq = y_pred.shape[:2]
         loss = 0
-
         seq_dims = list(range(y_pred.size(2)))
         weights_sum = 0
+
         for i in seq_dims:
-            weight = 1 - (i - seq_dims[0]) / (len(seq_dims) - seq_dims[0])
-            # weight = weight**2
+            weight = (i + 1) / len(seq_dims)
+            weight = (weight + 1) / 2
             weights_sum += weight
 
             loss += F.nll_loss(
                 input=y_pred[:, :, i].reshape(-1, *y_pred.shape[-3:]),
                 target=y.reshape(-1, *y.shape[-2:]),
             )
-            # loss *= weight
+            loss *= weight
 
         # loss /= weights_sum
         loss /= len(seq_dims)
@@ -163,7 +162,7 @@ class HyperRecurrentCNN(ut.Module):
         y_pred = ut.mask_seq_from_lens(y_pred, test_len)
 
         # SRC - https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks
-        # predit output from output
+        # predict output from output
         # enforces stability after solution is reached
         y_pred_out = self.forward_prepared(train, test_out, 1)
         y_pred_out = ut.mask_seq_from_lens(y_pred_out, test_len)
