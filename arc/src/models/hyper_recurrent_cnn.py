@@ -10,35 +10,20 @@ CHANNEL_DIM = 2
 
 
 class CA(nn.Module):
-    def __init__(self, features, in_channels, latent_space_inference):
+    def __init__(self, features, in_channels):
         super().__init__()
-        self.latent_space_inference = latent_space_inference
 
-        num_hidden = in_channels
-        if latent_space_inference:
-            num_hidden = 512
-            self.encode = ut.conv_block(
-                i=in_channels,
-                o=num_hidden,
-                ks=5,
-                s=1,
-                p=2,
-                a=nn.Softmax(dim=1),
-            )
+        self.in_channels = in_channels
 
-            self.decode = ut.conv_block( \
-                i=num_hidden, o=in_channels, \
-                ks=5, s=1, p=2, a=nn.Softmax(dim=1),
-            )
-
+        self.latent_size = 21
         # TODO: Write transformer indexing soft kernels Conv2D
         self.conv_1 = SoftKernelConv2D( \
-            features_size=features, num_kernels=256,
-            i=num_hidden, o=64, ks=3, p=1,
+            features_size=features, num_kernels=128,
+            i=in_channels + self.latent_size, o=64, ks=3, p=1,
         )
         self.conv_2 = SoftKernelConv2D( \
-            features_size=features, num_kernels=256,
-            i=64, o=num_hidden, ks=3, p=1,
+            features_size=features, num_kernels=128,
+            i=64, o=in_channels + self.latent_size, ks=3, p=1,
         )
         # self.conv_1 = \
         #     SoftLayerConv2D(num_kernels, i=num_hidden, o=64, ks=3, p=1)
@@ -52,9 +37,6 @@ class CA(nn.Module):
         self.conv_2.infer_params(task_features, infer_inputs)
 
         def solve_task(x):
-            if self.latent_space_inference:
-                x = self.encode(x)
-
             seq_shape = list(x.shape)
             seq_shape.insert(1, num_iters)
             seq = torch.zeros(seq_shape).to(x.device)
@@ -64,22 +46,32 @@ class CA(nn.Module):
                 x = self.bn_1(x)
                 x = F.leaky_relu(x, negative_slope=0.5)
                 x = self.conv_2(x)
-                x = torch.softmax(x, dim=1)
+
+                # Softmax only the input channels
+                x[:, :self.in_channels] = \
+                    torch.softmax(x[:, :self.in_channels].clone(), dim=1)
+                x[:, self.in_channels:] = \
+                    F.tanh(x[:, self.in_channels:].clone())
+
+                # x = torch.softmax(x, dim=1)
                 seq[:, i] = x
 
-            if self.latent_space_inference:
-                seq = ut.time_distribute(self.decode, seq)
-
+            seq = seq[:, :, :self.in_channels]
             return torch.log(seq)
 
-        return ut.time_distribute(solve_task, infer_inputs)
+        new_shape = list(infer_inputs.shape)
+        new_shape[CHANNEL_DIM] += self.latent_size
+        new_input = torch.ones(*new_shape).to(infer_inputs.device)
+        new_input[:, :, :self.in_channels] = infer_inputs
+
+        return ut.time_distribute(solve_task, new_input)
 
 
 class HyperRecurrentCNN(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
 
-    def __init__(self, input_channels, num_iters, latent_space_inference):
+    def __init__(self, input_channels, num_iters):
         super().__init__()
         features = 128
         self.num_iters = num_iters
@@ -100,7 +92,6 @@ class HyperRecurrentCNN(ut.Module):
         self.ca = CA(
             features=features,
             in_channels=input_channels,
-            latent_space_inference=latent_space_inference,
         )
 
     def forward(self, batch, num_iters=1):
@@ -190,7 +181,6 @@ def make_model(hparams):
     return HyperRecurrentCNN(
         input_channels=hparams['input_channels'],
         num_iters=hparams['nca_iterations'],
-        latent_space_inference=hparams['latent_space_inference'],
     )
 
 
