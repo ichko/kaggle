@@ -16,6 +16,11 @@ norm = colors.Normalize(vmin=0, vmax=len(pallet))
 # TODO: Show distrib of different tasks kernel picking vectors
 # TODO: Plot difference between different kernels
 # TODO: Visualize solutions with a gif
+# TODO: Log val set solutions
+# TODO: Log distance to solutions of train and val set
+
+# TODO: Write readme
+# TODO: Try with bigger networks
 
 
 def normalize_board(board):
