@@ -11,9 +11,8 @@ defaults = dict(
 configs = dict(
     hyper_recurrent_cnn=dict(
         model='hyper_recurrent_cnn',
-        nca_iterations=20,
+        nca_iterations=10,
         input_channels=11,
-        latent_space_inference=False,
     ),
     _=None,
 )

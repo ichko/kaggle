@@ -104,6 +104,7 @@ def main(hparams):
 
     # Summary for the logger
     model.summary()
+    # torch.autograd.set_detect_anomaly(True)
 
     for epoch in tqdm(range(hparams.epochs)):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
