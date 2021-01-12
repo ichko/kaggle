@@ -419,12 +419,12 @@ def spatial_transformer(i, num_channels, only_translations=False):
 
 def one_hot(tensor, num_classes, dim):
     tensor = F.one_hot(tensor.long(), num_classes=num_classes).float()
-    new_shape = list(tensor.shape)
+    permute = list(range(tensor.dim()))
     # Place last dim (one-hot) on the desired position
-    val = new_shape.pop()
-    new_shape.insert(dim, val)
+    last_dim = permute.pop()
+    permute.insert(dim, last_dim)
     # Move the one hot encoded dimension in the channel dim
-    tensor = tensor.permute(0, 1, 4, 2, 3)
+    tensor = tensor.permute(permute)
 
     return tensor
 
