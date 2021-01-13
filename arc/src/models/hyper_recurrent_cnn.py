@@ -51,7 +51,7 @@ class CA(nn.Module):
                 x[:, :self.in_channels] = \
                     torch.softmax(x[:, :self.in_channels].clone(), dim=1)
                 x[:, self.in_channels:] = \
-                    F.tanh(x[:, self.in_channels:].clone())
+                    torch.tanh(x[:, self.in_channels:].clone())
 
                 # x = torch.softmax(x, dim=1)
                 seq[:, i] = x
@@ -167,13 +167,18 @@ class HyperRecurrentCNN(ut.Module):
             loss.backward()
             self.optim.step()
 
+        y_pred_seq = y_pred.argmax(dim=CHANNEL_DIM + 1)
+        y_pred_last = y_pred_seq[:, :, -1]
+
         return loss.item(), {
             'X': X,
             'y': y,
+            'y_pred': y_pred_last,
             'test_len': test_len,
             'test_inputs': test_in.argmax(dim=CHANNEL_DIM),
             'test_outputs': y_argmax,
-            'test_preds': y_pred[:, :, -1].argmax(dim=CHANNEL_DIM),
+            'test_preds': y_pred_last,
+            'test_preds_seq': y_pred_seq,
         }
 
 
