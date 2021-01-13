@@ -44,6 +44,9 @@ class WAndB:
     def log(self, dict):
         wandb.log(dict)
 
+    def log_video(self, name, path):
+        wandb.log({name: wandb.Video(path)})
+
     def log_images(self, name, imgs):
         wandb.log({name: [wandb.Image(i) for i in imgs]})
 

@@ -7,7 +7,6 @@ defaults = dict(
     bs=20,
 )
 
-# TODO: Infer in latent space
 configs = dict(
     hyper_recurrent_cnn=dict(
         model='hyper_recurrent_cnn',
