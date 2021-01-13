@@ -1,6 +1,6 @@
 # Hyper Neural Cellular Automata (HNCA)
 
-This repository contains my research code ideas around the [fchollet](https://twitter.com/fchollet)'s [ARC Challenge](https://www.kaggle.com/c/abstraction-and-reasoning-challenge/).
+This repository contains experiments and ideas around the [fchollet](https://twitter.com/fchollet)'s [ARC Challenge](https://www.kaggle.com/c/abstraction-and-reasoning-challenge/).
 
 ## About the challenge
 
@@ -35,6 +35,9 @@ The idea of my "end-to-end solution" is as follows:
   based optimization (SGD).
 
 ## In detail
+
+"Address parameters" in differentiable way to use them in
+some differentiable computation.
 
 The ideas here are based on some ideas I had during the making of my masters
 thesis project on learning to simulate games with neural networks.
@@ -82,3 +85,7 @@ TODO: Add diagrams
 
 TODO: Add examples of canonical grids.
 _Example of canonical grid_
+
+## Notes
+
+- NCA infer in latent space - explain in details
