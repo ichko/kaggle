@@ -1,3 +1,5 @@
+import argparse
+
 import src.data as data
 import src.vis as vis
 import src.models as models
@@ -5,11 +7,10 @@ import src.loggers as loggers
 import src.config as config
 import src.utils as utils
 
-import torch
-import matplotlib.pyplot as plt
+import numpy as np
 from tqdm.auto import tqdm
-
-import argparse
+import matplotlib.pyplot as plt
+import torch
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -20,10 +21,16 @@ def evaluate(model, dataloader, num_iters):
     error = 0
     length = 0
     num_solved = 0
+    losses = []
 
-    for X, y_batch in tqdm(dataloader):
+    for batch in tqdm(dataloader):
+        X, y_batch = batch
         # Currently outputting single prediction per test input
-        y_hat_batch = model(X, num_iters)
+        with torch.no_grad():
+            y_hat_batch = model(X, num_iters)
+            loss, _ = model.optim_step(batch)
+
+        losses.append(loss)
 
         for y, y_hat in zip(y_batch, y_hat_batch):
             length += 1
@@ -35,7 +42,8 @@ def evaluate(model, dataloader, num_iters):
             else:
                 error += 1
 
-    return error / length, num_solved
+    losses = np.array(losses).mean()
+    return error / length, num_solved, losses
 
 
 def get_model(hparams):
@@ -119,27 +127,30 @@ def main(hparams):
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            train_score, train_solved = evaluate(model, train_dl,
-                                                 hparams.nca_iterations)
-            val_score, val_solved = evaluate(model, val_dl,
-                                             hparams.nca_iterations)
+            train_score, train_solved, train_loss = \
+                evaluate(model, train_dl, hparams.nca_iterations)
+            val_score, val_solved, val_loss = \
+                evaluate(model, val_dl, hparams.nca_iterations)
 
             idx = 0
             length = info['test_len'][idx]
             inputs = info['test_inputs'][idx, :length]
             outputs = info['test_outputs'][idx, :length]
             preds = info['test_preds'][idx, :length]
+            preds_seq = info['test_preds_seq'][idx, :length]
+
+            vid_path = f'.videos/pred{str(epoch)}.mp4'
+            vis.save_task_vid(
+                path=vid_path,
+                inputs=inputs,
+                outputs=outputs,
+                preds_seq=preds_seq,
+            ),
+            logger.log_video('task', vid_path)
 
             logger.log({
-                'task':
-                vis.plot_task_inference(
-                    inputs=inputs,
-                    outputs=outputs,
-                    preds=preds,
-                ),
-            })
-
-            logger.log({
+                'train_loss_mean': train_loss,
+                'val_loss_mean': val_loss,
                 'train_y': vis.plot_grid(outputs[0]),
                 'train_y_pred': vis.plot_grid(preds[0]),
                 'train_score': train_score,
@@ -152,9 +163,9 @@ def main(hparams):
             print('FINAL TRAIN SCORE:', train_score)
             print('FINAL VAL SCORE:', val_score)
 
-            model.persist()
+            # model.persist()
 
-        model.save()
+        # model.save()
 
 
 if __name__ == '__main__':
