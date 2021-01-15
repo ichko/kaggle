@@ -11,9 +11,6 @@ if IS_DEBUG:
 
 class WAndB:
     def __init__(self, name, model, hparams):
-
-        self.type = type
-
         wandb.init(
             name=name,
             dir='.reports',

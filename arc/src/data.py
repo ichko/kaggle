@@ -127,21 +127,21 @@ def load_arc_data(path, bs, shuffle, device='cpu'):
             all_in = ut.fix_dim_size(all_in, max_all_pairs, dim=seq_dim)
             all_out = ut.fix_dim_size(all_out, max_all_pairs, dim=seq_dim)
 
-            return dict(
-                name=name,
-                #
-                train_input=train_in,
-                train_output=train_out,
-                train_len=train_len,
-                #
-                test_input=test_in,
-                test_output=test_out,
-                test_len=test_len,
-                #
-                input=all_in,
-                output=all_out,
-                len=all_len,
-            ), test_out,
+            return {
+                'name': name,
+                # train
+                'train_in': train_in,
+                'train_out': train_out,
+                'train_len': train_len,
+                # test
+                'test_in': test_in,
+                'test_out': test_out,
+                'test_len': test_len,
+                # all
+                'in': all_in,
+                'out': all_out,
+                'len': all_len,
+            }, test_out
 
     dl = td.DataLoader(
         Dataset(),

@@ -6,6 +6,8 @@ import src.models as models
 import src.loggers as loggers
 import src.config as config
 import src.utils as utils
+import src.metrics as metrics
+import src.preprocess as preprocess
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -13,37 +15,6 @@ import matplotlib.pyplot as plt
 import torch
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-
-# https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
-# AVG TOP 3 for each task (less is better)
-def evaluate(model, dataloader, num_iters):
-    error = 0
-    length = 0
-    num_solved = 0
-    losses = []
-
-    for batch in tqdm(dataloader):
-        X, y_batch = batch
-        # Currently outputting single prediction per test input
-        with torch.no_grad():
-            y_hat_batch = model(X, num_iters)
-            loss, _ = model.optim_step(batch)
-
-        losses.append(loss)
-
-        for y, y_hat in zip(y_batch, y_hat_batch):
-            length += 1
-            assert y_hat.shape == y.shape, \
-                "The shapes of y and y_pred should match!!!"
-
-            if torch.all(y_hat.int() == y.int()).item():
-                num_solved += 1
-            else:
-                error += 1
-
-    losses = np.array(losses).mean()
-    return error / length, num_solved, losses
 
 
 def get_model(hparams):
@@ -66,15 +37,15 @@ def main(hparams):
     pp = pprint.PrettyPrinter(4)
     pp.pprint(vars(hparams))
 
-    train_dl = data.load_data(
-        '.data/training',
+    train_dl = data.load_arc_data(
+        path='.data/training',
         bs=hparams.bs,
         shuffle=True,
         device=DEVICE,
     )
 
-    val_dl = data.load_data(
-        '.data/evaluation',
+    val_dl = data.load_arc_data(
+        path='.data/evaluation',
         bs=hparams.bs,
         shuffle=False,
         device=DEVICE,
@@ -107,7 +78,6 @@ def main(hparams):
         name=hparams.model,
         model=model,
         hparams=hparams,
-        type='image',
     )
 
     # Summary for the logger
@@ -121,38 +91,23 @@ def main(hparams):
         tq_batches = tqdm(train_dl)
         for idx, batch in enumerate(tq_batches):
             # with ef.scan(wait=i == 0):
+            batch = preprocess.stochastic(batch)
             loss, info = model.optim_step(batch)
 
             tq_batches.set_description(f'Loss: {loss:.6f}')
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            train_score, train_solved, train_loss = \
-                evaluate(model, train_dl, hparams.nca_iterations)
-            val_score, val_solved, val_loss = \
-                evaluate(model, val_dl, hparams.nca_iterations)
-
-            idx = 0
-            length = info['test_len'][idx]
-            inputs = info['test_inputs'][idx, :length]
-            outputs = info['test_outputs'][idx, :length]
-            preds = info['test_preds'][idx, :length]
-            preds_seq = info['test_preds_seq'][idx, :length]
-
-            vid_path = f'.videos/pred{str(epoch)}.mp4'
-            vis.save_task_vid(
-                path=vid_path,
-                inputs=inputs,
-                outputs=outputs,
-                preds_seq=preds_seq,
-            ),
-            logger.log_video('task', vid_path)
+            train_score, train_solved = \
+                metrics.arc_eval(model, train_dl, hparams.nca_iterations)
+            val_score, val_solved = \
+                metrics.arc_eval(model, val_dl, hparams.nca_iterations)
+            train_loss_mean = utils.score(model, train_dl)
+            val_loss_mean = utils.score(model, val_dl)
 
             logger.log({
-                'train_loss_mean': train_loss,
-                'val_loss_mean': val_loss,
-                'train_y': vis.plot_grid(outputs[0]),
-                'train_y_pred': vis.plot_grid(preds[0]),
+                'train_loss_mean': train_loss_mean,
+                'val_loss_mean': val_loss_mean,
                 'train_score': train_score,
                 'val_score': val_score,
                 'train_solved': train_solved,
