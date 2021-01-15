@@ -31,7 +31,7 @@ def arc_eval(model, dataloader, num_iters):
 
 def loss(model, dataloader):
     losses = []
-    for batch in dataloader:
+    for batch in tqdm(dataloader):
         batch = preprocess.strict(batch)
         with torch.no_grad():
             loss, _ = model.optim_step(batch)

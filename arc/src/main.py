@@ -25,6 +25,26 @@ def get_model(hparams):
     return model
 
 
+def log(model, dataloader, prefix, hparams):
+    batch = preprocess.strict(next(iter(dataloader)))
+
+    # Log example task
+    with torch.no_grad():
+        _loss, info = model.optim_step(batch)
+        logger.log_info(info, prefix=prefix, idx=0)
+
+    score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
+    loss_mean = metrics.loss(model, dataloader)
+
+    logger.log({
+        f'{prefix}_loss_mean': loss_mean,
+        f'{prefix}_score': score,
+        f'{prefix}_solved': solved,
+    })
+
+    print(f'{prefix.upper()} LOSS  :', loss_mean)
+
+
 def main(hparams):
     import pprint
     import sys
@@ -93,25 +113,9 @@ def main(hparams):
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            train_score, train_solved = \
-                metrics.arc_eval(model, train_dl, hparams.nca_iterations)
-            val_score, val_solved = \
-                metrics.arc_eval(model, val_dl, hparams.nca_iterations)
-            train_loss_mean = metrics.loss(model, train_dl)
-            val_loss_mean = metrics.loss(model, val_dl)
-
-            logger.log({
-                'train_loss_mean': train_loss_mean,
-                'val_loss_mean': val_loss_mean,
-                'train_score': train_score,
-                'val_score': val_score,
-                'train_solved': train_solved,
-                'val_solved': val_solved,
-            })
-
-            print(f'====== EPOCH {epoch} END ======')
-            print('FINAL TRAIN SCORE:', train_score)
-            print('FINAL VAL SCORE:', val_score)
+            print(f'======= LOG =======')
+            log(model, train_dl, prefix='train', hparams=hparams)
+            log(model, val_dl, prefix='val', hparams=hparams)
 
             # model.persist()
 
