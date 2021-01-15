@@ -3,6 +3,7 @@
 mkdir .reports
 mkdir .models
 mkdir .data
+mkdir .temp
 
 cd .data
 # pip -q uninstall kaggle -y
