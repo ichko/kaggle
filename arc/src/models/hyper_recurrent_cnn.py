@@ -94,12 +94,15 @@ class HyperRecurrentCNN(ut.Module):
             in_channels=input_channels,
         )
 
-    def forward(self, batch, num_iters=1):
-        train_inputs = ut.one_hot(batch['train_inputs'], 11, dim=2)
-        train_outputs = ut.one_hot(batch['train_outputs'], 11, dim=2)
-        infer_inputs = ut.one_hot(batch['test_inputs'], 11, dim=2)
-        train_io = torch.cat([train_inputs, train_outputs], dim=CHANNEL_DIM)
-        preds = self.forward_prepared(train_io, infer_inputs, num_iters)
+    def forward(self, batch, num_iters=None):
+        if num_iters is None:
+            num_iters = self.num_iters
+
+        preds = self.forward_prepared(
+            batch['train'],
+            batch['test_in'],
+            num_iters,
+        )
 
         return preds[:, :, -1].argmax(dim=CHANNEL_DIM)
 
@@ -131,35 +134,28 @@ class HyperRecurrentCNN(ut.Module):
 
         return loss
 
-    def optim_step(self, batch, optim_kw={}):
-        # TODO: Mask train pairs after using them for inference
-        X, y = batch
-        max_train = 3
-        max_test = 2
+    def optim_step(self, batch):
+        X, _ = batch
 
-        lens = X['all_len']
-        all_in = ut.one_hot(X['all_inputs'], num_classes=11, dim=CHANNEL_DIM)
-        all_out = ut.one_hot(X['all_outputs'], num_classes=11, dim=CHANNEL_DIM)
-        pairs = torch.cat([all_in, all_out], dim=CHANNEL_DIM)
-
-        train, _train_len = ut.sample_padded_sequences(pairs, lens, max_train)
-        test, test_len = ut.sample_padded_sequences(pairs, lens, max_test)
-
-        test_in, test_out = test.chunk(2, dim=CHANNEL_DIM)
-
-        y_argmax = torch.argmax(test_out, dim=CHANNEL_DIM)
-
-        y_pred = self.forward_prepared(train, test_in, self.num_iters)
-        y_pred = ut.mask_seq_from_lens(y_pred, test_len)
+        y_pred = self.forward_prepared(
+            X['train'],
+            X['test_in'],
+            self.num_iters,
+        )
+        y_pred = ut.mask_seq_from_lens(y_pred, X['test_len'])
 
         # SRC - https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks
         # predict output from output
         # enforces stability after solution is reached
-        y_pred_out = self.forward_prepared(train, test_out, 1)
-        y_pred_out = ut.mask_seq_from_lens(y_pred_out, test_len)
+        y_pred_out = self.forward_prepared(
+            X['train'],
+            X['test_in'],
+            num_iters=1,
+        )
+        y_pred_out = ut.mask_seq_from_lens(y_pred_out, X['test_len'])
 
-        loss_infer = self.criterion_(y_pred, y_argmax)
-        loss_out_to_out = self.criterion_(y_pred_out, y_argmax)
+        loss_infer = self.criterion_(y_pred, X['test_out'])
+        loss_out_to_out = self.criterion_(y_pred_out, X['test_out'])
         loss = (loss_infer + loss_out_to_out) / 2
 
         if loss.requires_grad:
@@ -171,14 +167,12 @@ class HyperRecurrentCNN(ut.Module):
         y_pred_last = y_pred_seq[:, :, -1]
 
         return loss.item(), {
-            'X': X,
-            'y': y,
-            'y_pred': y_pred_last,
-            'test_len': test_len,
-            'test_inputs': test_in.argmax(dim=CHANNEL_DIM),
-            'test_outputs': y_argmax,
-            'test_preds': y_pred_last,
-            'test_preds_seq': y_pred_seq,
+            'loss': loss,
+            'test_len': X['test_len'],
+            'test_in': X['test_in'].argmax(dim=CHANNEL_DIM),
+            'test_out': X['test_out'],
+            'test_pred': y_pred_last,
+            'test_pred_seq': y_pred_seq,
         }
 
 
