@@ -1,12 +1,12 @@
 import os
 import json
-import numpy as np
-import src.utils as utils
 
+import numpy as np
 import torch
 import torch.utils.data as td
 from torch.nn.utils.rnn import pad_sequence
 
+import src.utils as utils
 import src.nn_utils as ut
 
 
