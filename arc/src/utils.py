@@ -2,6 +2,8 @@ import sys
 
 IS_DEBUG = '--debug' in sys.argv
 
+# torch.autograd.set_detect_anomaly(True)
+
 
 def memoize(f):
     memo = {}

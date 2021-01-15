@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+import src.preprocess as preprocess
+
 
 # https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
 # AVG TOP 3 for each task (less is better)
@@ -10,7 +12,8 @@ def arc_eval(model, dataloader, num_iters):
     length = 0
     num_solved = 0
 
-    for X, y_batch in tqdm(dataloader):
+    for batch in tqdm(dataloader):
+        X, y_batch = preprocess.strict(batch)
         # Currently outputting single prediction per test input
         y_hat_batch = model(X, num_iters)
         length += len(y_batch)
@@ -29,6 +32,7 @@ def arc_eval(model, dataloader, num_iters):
 def loss(model, dataloader):
     losses = []
     for batch in dataloader:
+        batch = preprocess.strict(batch)
         with torch.no_grad():
             loss, _ = model.optim_step(batch)
             losses.append(loss)

@@ -1,5 +1,5 @@
 import torch
-import nn_utils as ut
+import src.nn_utils as ut
 
 # TODO: Mask train pairs after using them for inference
 CHANNEL_DIM = 2
@@ -8,9 +8,10 @@ NUM_CLASSES = 11
 
 def strict(batch):
     X, _ = batch
-    train_in = ut.one_hot(X['train_input'], NUM_CLASSES, CHANNEL_DIM)
-    train_out = ut.one_hot(X['train_input'], NUM_CLASSES, CHANNEL_DIM)
-    test_in = ut.one_hot(X['test_input'], NUM_CLASSES, CHANNEL_DIM)
+    train_in = ut.one_hot(X['train_in'], NUM_CLASSES, CHANNEL_DIM)
+    train_out = ut.one_hot(X['train_in'], NUM_CLASSES, CHANNEL_DIM)
+    test_in = ut.one_hot(X['test_in'], NUM_CLASSES, CHANNEL_DIM)
+    test_out = X['test_out'].long()
 
     train = torch.cat([train_in, train_out], dim=CHANNEL_DIM)
 
@@ -19,8 +20,8 @@ def strict(batch):
         'test_len': X['test_len'],
         'train': train,
         'test_in': test_in,
-        'test_out': X['test_out'],
-    }, X['test_out']
+        'test_out': test_out,
+    }, test_out
 
 
 def stochastic(batch, max_train=3, max_test=2):

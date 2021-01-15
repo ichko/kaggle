@@ -1,16 +1,12 @@
-import argparse
-
 import src.data as data
 import src.vis as vis
 import src.models as models
-import src.loggers as loggers
+import src.logger as logger
 import src.config as config
 import src.utils as utils
 import src.metrics as metrics
 import src.preprocess as preprocess
 
-import numpy as np
-from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import torch
 
@@ -74,7 +70,7 @@ def main(hparams):
         _ = input()
         print('...')
 
-    logger = loggers.WAndB(
+    logger.init(
         name=hparams.model,
         model=model,
         hparams=hparams,
@@ -82,7 +78,6 @@ def main(hparams):
 
     # Summary for the logger
     model.summary()
-    # torch.autograd.set_detect_anomaly(True)
 
     for epoch in tqdm(range(hparams.epochs)):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
@@ -102,8 +97,8 @@ def main(hparams):
                 metrics.arc_eval(model, train_dl, hparams.nca_iterations)
             val_score, val_solved = \
                 metrics.arc_eval(model, val_dl, hparams.nca_iterations)
-            train_loss_mean = utils.score(model, train_dl)
-            val_loss_mean = utils.score(model, val_dl)
+            train_loss_mean = metrics.loss(model, train_dl)
+            val_loss_mean = metrics.loss(model, val_dl)
 
             logger.log({
                 'train_loss_mean': train_loss_mean,
@@ -124,6 +119,8 @@ def main(hparams):
 
 
 if __name__ == '__main__':
+    import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--config',
