@@ -10,7 +10,7 @@ import torch.nn.functional as F
 class Module(nn.Module):
     def __init__(self):
         super().__init__()
-        self.name = 'Custom Module'
+        self.name = self.__class__.__name__
         self.criterion = nn.MSELoss()
 
     def count_parameters(self):
@@ -93,34 +93,25 @@ class Module(nn.Module):
         return next(self.parameters()).device
 
 
-class DenseAE(Module):
-    def __init__(self, hid_size=2):
-        super().__init__()
-        self.hid_size = hid_size
+def pad_in_dim(tensor, pad_size, dim, val=0):
+    shape = list(tensor.shape)
+    shape[dim] = pad_size - shape[dim]
+    padding = torch.full(shape, val).to(tensor.device)
+    out = torch.cat([tensor, padding], dim=dim)
 
-    def forward(self, x):
-        if not hasattr(self, 'encoder'):
-            dims = np.prod(list(x.shape[1:]))
-            self.encoder = nn.Sequential(
-                nn.Flatten(),
-                dense(dims, 128),
-                dense(128, 16),
-                dense(16, self.hid_size, a=None),
-            )
+    return out
 
-            self.decoder = nn.Sequential(
-                dense(self.hid_size, 16),
-                dense(16, 128),
-                dense(128, np.prod(x.shape[1:]), a=nn.Sigmoid()),
-                Reshape(-1, *x.shape[1:]),
-            )
 
-            self.criterion = nn.BCELoss(reduction='mean')
-            self.to(x.device)
+# Trim and or slice tensor
+def fix_dim_size(tensor, size, dim, pad_value=0):
+    # Slice only dim
+    indices = {dim: slice(0, size)}
+    idx = [indices.get(dim, slice(None)) for dim in range(tensor.ndim)]
 
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+    tensor = tensor[idx]
+    tensor = pad_in_dim(tensor, size, dim, pad_value)
+
+    return tensor
 
 
 def leaky():
