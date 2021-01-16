@@ -31,27 +31,22 @@ def log(dict):
     wandb.log(dict)
 
 
-def log_info_to_local_dir(info, vid_path, idx=0):
+def log_info(caption, info, prefix, idx=0):
     length = info['test_len'][idx]
     inputs = info['test_in'][idx, :length]
     outputs = info['test_out'][idx, :length]
     preds_seq = info['test_pred_seq'][idx, :length]
+    preds = info['test_pred'][idx, :length]
 
+    vid_path = '.temp/last_pred_vid.mp4'
     vis.save_task_vid(
         path=vid_path,
         inputs=inputs,
         outputs=outputs,
         preds_seq=preds_seq,
+        title=caption,
+        size=2,
     )
-
-
-def log_info(info, prefix, idx=0):
-    vid_path = '.temp/last_pred_vid.mp4'
-    log_info_to_local_dir(info, vid_path, idx)
-
-    length = info['test_len'][idx]
-    outputs = info['test_out'][idx, :length]
-    preds = info['test_pred'][idx, :length]
 
     wandb.log({f'{prefix}_task': wandb.Video(vid_path)})
 
