@@ -9,6 +9,10 @@ import src.preprocess as preprocess
 
 import matplotlib.pyplot as plt
 import torch
+from datetime import datetime
+import os
+
+RUN_ID = f'run_{datetime.now()}'
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -20,7 +24,7 @@ def get_model(hparams):
     model_module.sanity_check()
 
     model = model_module.make_model(vars(hparams))
-    model.make_persisted(f'.models/{model.name}.weights')
+    model.make_persisted(f'.models/{model.name}_{RUN_ID}.weights')
 
     return model
 
@@ -32,7 +36,11 @@ def log(model, dataloader, prefix, hparams):
     # Log example task
     with torch.no_grad():
         _loss, info = model.optim_step(batch)
-        logger.log_info(info, prefix=prefix, idx=0)
+
+        idx = 0
+        X, _y = batch
+        name = X['name'][idx]
+        logger.log_info(caption=name, info=info, prefix=prefix, idx=idx)
 
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
     loss_mean = metrics.loss(model, dataloader)

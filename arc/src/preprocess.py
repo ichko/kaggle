@@ -16,6 +16,7 @@ def strict(batch):
     train = torch.cat([train_in, train_out], dim=CHANNEL_DIM)
 
     return {
+        'name': X['name'],
         'train_len': X['train_len'],
         'test_len': X['test_len'],
         'train': train,
@@ -34,6 +35,7 @@ def strict_predict_all_tiles(batch):
     all_out = X['out'].long()
 
     return {
+        'name': X['name'],
         'train_len': X['train_len'],
         'test_len': X['len'],
         'train': train,
@@ -56,6 +58,7 @@ def stochastic(batch, max_train=3, max_test=2):
     test_out = torch.argmax(test_out, dim=CHANNEL_DIM)
 
     return {
+        'name': None,
         'train_len': train_len,
         'test_len': test_len,
         'train': train,

@@ -447,7 +447,7 @@ def sample_padded_sequences(sequences, lens, sample_size):
             dim=0,
             dim_size=length,
         )
-        data[i, :len(sample)] = sample
+        data[i, :sample.size(0)] = sample
 
     return data, new_lens
 

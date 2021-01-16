@@ -24,9 +24,11 @@ norm = colors.Normalize(vmin=0, vmax=len(pallet))
 # TODO: Try with bigger networks
 
 
-def save_task_vid(path, inputs, outputs, preds_seq, size=2):
+def save_task_vid(path, inputs, outputs, preds_seq, title='', size=2):
     cols, rows = 4, len(inputs)
+
     fig = plt.figure(figsize=(cols * size, rows * size))
+
     add_or_get_subplot = utils.memoize(fig.add_subplot)
 
     def get_actors(preds):
@@ -47,7 +49,9 @@ def save_task_vid(path, inputs, outputs, preds_seq, size=2):
     seq_dim = 1
     seq_range = range(preds_seq.size(seq_dim))
     imgs = [list(get_actors(preds_seq[:, i])) for i in seq_range]
-    fig.tight_layout()
+
+    fig.suptitle(title, y=0.99, fontsize=14)
+    fig.tight_layout(pad=2.5)
 
     ani = animation.ArtistAnimation(fig, imgs, interval=500, blit=True)
     ani.save(path)
