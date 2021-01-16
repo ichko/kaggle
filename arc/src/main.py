@@ -26,7 +26,8 @@ def get_model(hparams):
 
 
 def log(model, dataloader, prefix, hparams):
-    batch = preprocess.strict(next(iter(dataloader)))
+    batch = next(iter(dataloader))
+    batch = preprocess.strict_predict_all_tiles(batch)
 
     # Log example task
     with torch.no_grad():
@@ -42,7 +43,11 @@ def log(model, dataloader, prefix, hparams):
         f'{prefix}_solved': solved,
     })
 
-    print(f'{prefix.upper()} LOSS  :', loss_mean)
+    print('\n', flush=True)
+    print(f'======= LOG {prefix.upper()} =======', flush=True)
+    print(f'{prefix.upper()} LOSS  :', loss_mean, flush=True)
+    print(f'{prefix.upper()} SOLVED:', solved, flush=True)
+    print('\n', flush=True)
 
 
 def main(hparams):
@@ -63,7 +68,7 @@ def main(hparams):
     val_dl = data.load_arc_data(
         path='.data/evaluation',
         bs=hparams.bs,
-        shuffle=False,
+        shuffle=True,
         device=DEVICE,
     )
 
@@ -113,7 +118,6 @@ def main(hparams):
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            print(f'======= LOG =======')
             log(model, train_dl, prefix='train', hparams=hparams)
             log(model, val_dl, prefix='val', hparams=hparams)
 
@@ -126,12 +130,10 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--config',
-        help='id of configuration',
-    )
+    parser.add_argument('--config', help='id of configuration')
     parser.add_argument('--from-scratch', action='store_false')
     parser.add_argument('--debug', action='store_true')
+
     args = parser.parse_args()
 
     hparams = config.get_hparams(args.config)
