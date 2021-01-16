@@ -1,7 +1,7 @@
 from argparse import Namespace
 
 defaults = dict(
-    eval_interval=5,
+    eval_interval=20,
     lr=0.00005,
     epochs=1_000_000,
     bs=20,

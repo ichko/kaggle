@@ -102,10 +102,12 @@ def load_arc_data(path, bs, shuffle, device='cpu'):
     def get(selectors, task, max_pairs):
         train_test, io = selectors
         data = torch.Tensor([t[io] for t in task[train_test]])
+        # This should be here - before we fix the dim size
+        length = min(len(data), max_pairs)
         data = ut.fix_dim_size(data, max_pairs, dim=seq_dim)
         data = data.to(device)
 
-        return data, len(data)
+        return data, length
 
     class Dataset(td.Dataset):
         def __len__(self):
