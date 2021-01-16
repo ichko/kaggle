@@ -24,6 +24,24 @@ def strict(batch):
     }, test_out
 
 
+def strict_predict_all_tiles(batch):
+    X, _ = batch
+    train_out = ut.one_hot(X['train_out'], NUM_CLASSES, CHANNEL_DIM)
+    train_in = ut.one_hot(X['train_in'], NUM_CLASSES, CHANNEL_DIM)
+    train = torch.cat([train_in, train_out], dim=CHANNEL_DIM)
+
+    all_in = ut.one_hot(X['in'], NUM_CLASSES, CHANNEL_DIM)
+    all_out = X['out'].long()
+
+    return {
+        'train_len': X['train_len'],
+        'test_len': X['len'],
+        'train': train,
+        'test_in': all_in,
+        'test_out': all_out,
+    }, all_out
+
+
 def stochastic(batch, max_train=3, max_test=2):
     X, _ = batch
     lens = X['len']
