@@ -30,6 +30,7 @@ def get_model(hparams):
 
 
 def log(model, dataloader, prefix, hparams):
+    model.eval()
     batch = next(iter(dataloader))
     batch = preprocess.strict_predict_all_tiles(batch)
 
@@ -44,6 +45,7 @@ def log(model, dataloader, prefix, hparams):
 
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
     loss_mean = metrics.loss(model, dataloader)
+    model.train()
 
     logger.log({
         f'{prefix}_loss_mean': loss_mean,
@@ -129,9 +131,9 @@ def main(hparams):
             log(model, train_dl, prefix='train', hparams=hparams)
             log(model, val_dl, prefix='val', hparams=hparams)
 
-            # model.persist()
+            model.persist()
 
-        # model.save()
+        model.save()
 
 
 if __name__ == '__main__':
