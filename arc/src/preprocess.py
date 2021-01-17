@@ -9,7 +9,7 @@ NUM_CLASSES = 11
 def strict(batch):
     X, _ = batch
     train_in = ut.one_hot(X['train_in'], NUM_CLASSES, CHANNEL_DIM)
-    train_out = ut.one_hot(X['train_in'], NUM_CLASSES, CHANNEL_DIM)
+    train_out = ut.one_hot(X['train_out'], NUM_CLASSES, CHANNEL_DIM)
     test_in = ut.one_hot(X['test_in'], NUM_CLASSES, CHANNEL_DIM)
     test_out = X['test_out'].long()
 
@@ -27,8 +27,8 @@ def strict(batch):
 
 def strict_predict_all_tiles(batch):
     X, _ = batch
-    train_out = ut.one_hot(X['train_out'], NUM_CLASSES, CHANNEL_DIM)
     train_in = ut.one_hot(X['train_in'], NUM_CLASSES, CHANNEL_DIM)
+    train_out = ut.one_hot(X['train_out'], NUM_CLASSES, CHANNEL_DIM)
     train = torch.cat([train_in, train_out], dim=CHANNEL_DIM)
 
     all_in = ut.one_hot(X['in'], NUM_CLASSES, CHANNEL_DIM)
