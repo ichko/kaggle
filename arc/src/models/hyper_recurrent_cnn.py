@@ -138,7 +138,7 @@ class HyperRecurrentCNN(ut.Module):
         return loss
 
     def optim_step(self, batch):
-        X, _ = batch
+        X, y = batch
 
         y_pred = self.forward_prepared(
             X['train'],
@@ -157,8 +157,8 @@ class HyperRecurrentCNN(ut.Module):
         )
         y_pred_out = ut.mask_seq_from_lens(y_pred_out, X['test_len'])
 
-        loss_infer = self.criterion_(y_pred, X['test_out'])
-        loss_out_to_out = self.criterion_(y_pred_out, X['test_out'])
+        loss_infer = self.criterion(y_pred, y)
+        loss_out_to_out = self.criterion(y_pred_out, y)
         loss = (loss_infer + loss_out_to_out) / 2
 
         if loss.requires_grad:
@@ -175,7 +175,7 @@ class HyperRecurrentCNN(ut.Module):
             'loss': loss,
             'test_len': X['test_len'],
             'test_in': X['test_in'].argmax(dim=CHANNEL_DIM),
-            'test_out': X['test_out'],
+            'test_out': y,
             'test_pred': y_pred_last,
             'test_pred_seq': y_pred_seq,
         }
