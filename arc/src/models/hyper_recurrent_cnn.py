@@ -43,8 +43,8 @@ class CA(nn.Module):
 
             for i in range(num_iters):
                 x = self.conv_1(x)
-                x = F.dropout(x, p=0.1, training=self.training)
-                # x = self.bn_1(x)
+                # x = F.dropout(x, p=0.01, training=self.training)
+                x = self.bn_1(x)
                 x = F.leaky_relu(x, negative_slope=0.5)
                 x = self.conv_2(x)
 
@@ -82,12 +82,11 @@ class HyperRecurrentCNN(ut.Module):
                 i=input_channels * 2, o=128, ks=5, s=2, p=2, \
                 a=ut.leaky(),
             ),
-            nn.Dropout(0.3),
             ut.conv_block(i=128, o=128, ks=5, s=2, p=2, a=ut.leaky()),
-            nn.Dropout(0.2),
+            # nn.Dropout(0.1),
             ut.conv_block(i=128, o=128, ks=5, s=2, p=2, a=ut.leaky()),
+            # nn.Dropout(0.05),
             ut.conv_block(i=128, o=64, ks=5, s=2, p=2, a=ut.leaky()),
-            nn.Dropout(0.1),
             ut.conv_block(i=64, o=128, ks=2, s=1, p=0, a=ut.leaky()),
             ut.Reshape(-1, 128),
             nn.Linear(128, features),
@@ -117,7 +116,7 @@ class HyperRecurrentCNN(ut.Module):
 
         return result
 
-    def criterion_(self, y_pred, y):
+    def criterion(self, y_pred, y):
         loss = 0
         seq_dims = list(range(y_pred.size(2)))
         weights_sum = 0
@@ -153,7 +152,7 @@ class HyperRecurrentCNN(ut.Module):
         # enforces stability after solution is reached
         y_pred_out = self.forward_prepared(
             X['train'],
-            X['test_in'],
+            X['test_out'],
             num_iters=1,
         )
         y_pred_out = ut.mask_seq_from_lens(y_pred_out, X['test_len'])
@@ -164,6 +163,8 @@ class HyperRecurrentCNN(ut.Module):
 
         if loss.requires_grad:
             self.optim.zero_grad()
+            # import efemarai as ef
+            # with ef.scan(wait=True):
             loss.backward()
             self.optim.step()
 
