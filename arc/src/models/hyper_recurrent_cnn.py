@@ -147,19 +147,21 @@ class HyperRecurrentCNN(ut.Module):
         )
         y_pred = ut.mask_seq_from_lens(y_pred, X['test_len'])
 
-        # SRC - https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks
-        # predict output from output
-        # enforces stability after solution is reached
-        y_pred_out = self.forward_prepared(
-            X['train'],
-            X['test_out'],
-            num_iters=1,
-        )
-        y_pred_out = ut.mask_seq_from_lens(y_pred_out, X['test_len'])
+        loss = self.criterion(y_pred, y)
 
-        loss_infer = self.criterion(y_pred, y)
-        loss_out_to_out = self.criterion(y_pred_out, y)
-        loss = (loss_infer + loss_out_to_out) / 2
+        if self.training:
+            # SRC - https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks
+            # predict output from output
+            # enforces stability after solution is reached
+            y_pred_out = self.forward_prepared(
+                X['train'],
+                X['test_out'],
+                num_iters=1,
+            )
+            y_pred_out = ut.mask_seq_from_lens(y_pred_out, X['test_len'])
+
+            loss_out_to_out = self.criterion(y_pred_out, y)
+            loss = (loss + loss_out_to_out) / 2
 
         if loss.requires_grad:
             self.optim.zero_grad()

@@ -38,10 +38,10 @@ def log(model, dataloader, prefix, hparams):
     with torch.no_grad():
         _loss, info = model.optim_step(batch)
 
-        idx = 0
-        X, _y = batch
-        name = X['name'][idx]
-        logger.log_info(caption=name, info=info, prefix=prefix, idx=idx)
+    idx = 0
+    X, _y = batch
+    name = X['name'][idx]
+    logger.log_info(caption=name, info=info, prefix=prefix, idx=idx)
 
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
     loss_mean = metrics.loss(model, dataloader)
@@ -120,8 +120,7 @@ def main(hparams):
 
         tq_batches = tqdm(train_dl)
         for idx, batch in enumerate(tq_batches):
-            # with ef.scan(wait=i == 0):
-            batch = preprocess.stochastic(batch)
+            batch = preprocess.stochastic_all(batch)
             loss, info = model.optim_step(batch)
 
             tq_batches.set_description(f'Loss: {loss:.6f}')
