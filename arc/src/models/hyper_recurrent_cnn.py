@@ -104,12 +104,10 @@ class HyperRecurrentCNN(ut.Module):
 
         return preds[:, :, -1].argmax(dim=CHANNEL_DIM)
 
-    def forward_prepared(self, train_io, infer_inputs, num_iters):
-        task_features = self.task_feature_extract(train_io)
-        result = self.ca(task_features, infer_inputs, num_iters)
-        self.task_features = task_features  # Save to return as info param
-
-        return result
+    def forward_prepared(self, train, test_in, num_iters):
+        task_features = self.task_feature_extract(train)
+        pred = self.ca(task_features, test_in, num_iters)
+        return pred
 
     def criterion(self, y_pred, y):
         loss = 0
@@ -121,16 +119,18 @@ class HyperRecurrentCNN(ut.Module):
             weight = (weight + 1) / 2
             weights_sum += weight
 
-            loss += F.nll_loss(
+            batch_losses = F.nll_loss(
                 input=y_pred[:, :, i].reshape(-1, *y_pred.shape[-3:]),
                 target=y.reshape(-1, *y.shape[-2:]),
-            )
-            loss *= weight
+                reduction='none',
+            ).mean(dim=(1, 2))
 
-        # loss /= weights_sum
-        loss /= len(seq_dims)
+            loss += batch_losses.mean() * weight
 
-        return loss
+        loss /= weights_sum
+        # loss /= len(seq_dims)
+
+        return loss, batch_losses  # The last batch losses
 
     def optim_step(self, batch):
         X, y = batch
@@ -142,7 +142,7 @@ class HyperRecurrentCNN(ut.Module):
         )
         y_pred = ut.mask_seq_from_lens(y_pred, X['test_len'])
 
-        loss = self.criterion(y_pred, y)
+        loss, batch_losses = self.criterion(y_pred, y)
 
         if self.training:
             # SRC - https://www.kaggle.com/teddykoker/training-cellular-automata-part-ii-learning-tasks
@@ -155,7 +155,7 @@ class HyperRecurrentCNN(ut.Module):
             )
             y_pred_out = ut.mask_seq_from_lens(y_pred_out, X['test_len'])
 
-            loss_out_to_out = self.criterion(y_pred_out, y)
+            loss_out_to_out, _ = self.criterion(y_pred_out, y)
             loss = (loss + loss_out_to_out) / 2
 
         if loss.requires_grad:
@@ -175,6 +175,7 @@ class HyperRecurrentCNN(ut.Module):
             'test_out': y,
             'test_pred': y_pred_last,
             'test_pred_seq': y_pred_seq,
+            'batch_losses': batch_losses,
         }
 
 
