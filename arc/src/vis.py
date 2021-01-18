@@ -24,7 +24,13 @@ norm = colors.Normalize(vmin=0, vmax=len(pallet))
 # TODO: Try with bigger networks
 
 
-def save_task_vid(path, inputs, outputs, preds_seq, title='', size=2):
+def make_np_image(im):
+    r = plt.gcf().canvas.get_renderer()
+    x = im.make_image(r)[0]
+    return x
+
+
+def make_task_animation(inputs, outputs, preds_seq, title='', size=2):
     cols, rows = 4, len(inputs)
 
     fig = plt.figure(figsize=(cols * size, rows * size))
@@ -51,9 +57,18 @@ def save_task_vid(path, inputs, outputs, preds_seq, title='', size=2):
     imgs = [list(get_actors(preds_seq[:, i])) for i in seq_range]
 
     fig.suptitle(title, y=0.99, fontsize=14)
-    fig.tight_layout(pad=2.5)
+    fig.tight_layout(pad=2.5, h_pad=1.2, w_pad=0)
 
-    ani = animation.ArtistAnimation(fig, imgs, interval=500, blit=True)
+    return animation.ArtistAnimation(fig, imgs, interval=500, blit=True)
+
+
+def task_to_np_anim(*args, **kwargs):
+    ani = make_task_animation(*args, **kwargs)
+    ani.new_frame_seq()
+
+
+def save_task_vid(path, *args, **kwargs):
+    ani = make_task_animation(*args, **kwargs)
     ani.save(path)
     plt.close()
 

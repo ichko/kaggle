@@ -14,6 +14,7 @@ import src.preprocess as preprocess
 
 import matplotlib.pyplot as plt
 import torch
+import numpy as np
 from tqdm import tqdm
 
 RUN_ID = f'run_{datetime.now()}'
@@ -51,14 +52,49 @@ def log(model, dataloader, prefix, hparams):
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
 
     losses = []
+    task_losses = []
+    infos = []
+    names = []
     for batch in tqdm(dataloader):
         batch = preprocess.strict(batch)
+        X, _ = batch
+        names.extend(X['name'])
         with torch.no_grad():
             loss, info = model.optim_step(batch)
             losses.append(loss)
 
-    loss_mean = torch.Tensor(losses).mean()
+            infos.append(info)
+            task_losses.append(info['batch_losses'])
 
+    task_losses = torch.cat(task_losses)
+    loss_sort_index = task_losses.argsort()
+
+    names = np.array(names)[loss_sort_index.tolist()]
+    infos = {
+        'test_len':
+        torch.cat([i['test_len'] for i in infos])[loss_sort_index],
+        'test_in':
+        torch.cat([i['test_in'] for i in infos])[loss_sort_index],
+        'test_out':
+        torch.cat([i['test_out'] for i in infos])[loss_sort_index],
+        'test_pred_seq':
+        torch.cat([i['test_pred_seq'] for i in infos])[loss_sort_index],
+        'test_pred':
+        torch.cat([i['test_pred'] for i in infos])[loss_sort_index],
+    }
+
+    for desc, idx in zip(['best', 'middle', 'worst'],
+                         [0, len(infos['test_len']) // 2, -1]):
+        X, _y = batch
+        name = names[idx]
+        logger.log_info(
+            caption=name,
+            info=infos,
+            prefix=prefix + '_' + desc,
+            idx=idx,
+        )
+
+    loss_mean = torch.Tensor(losses).mean()
     logger.log({
         f'{prefix}_loss_mean': loss_mean,
         f'{prefix}_score': score,

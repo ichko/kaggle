@@ -47,9 +47,9 @@ def strict_predict_all_tiles(batch):
 
 
 def _stochastic(lens, input, output, max_train=3, max_test=2):
-    all_in = ut.one_hot(input, NUM_CLASSES, CHANNEL_DIM)
-    all_out = ut.one_hot(output, NUM_CLASSES, CHANNEL_DIM)
-    pairs = torch.cat([all_in, all_out], dim=CHANNEL_DIM)
+    input = ut.one_hot(input, NUM_CLASSES, CHANNEL_DIM)
+    output = ut.one_hot(output, NUM_CLASSES, CHANNEL_DIM)
+    pairs = torch.cat([input, output], dim=CHANNEL_DIM)
 
     train, train_len = ut.sample_padded_sequences(pairs, lens, max_train)
     test, test_len = ut.sample_padded_sequences(pairs, lens, max_test)
