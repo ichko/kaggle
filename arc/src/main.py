@@ -1,3 +1,8 @@
+import os
+import sys
+import pprint
+from datetime import datetime
+
 import src.data as data
 import src.vis as vis
 import src.models as models
@@ -9,8 +14,7 @@ import src.preprocess as preprocess
 
 import matplotlib.pyplot as plt
 import torch
-from datetime import datetime
-import os
+from tqdm import tqdm
 
 RUN_ID = f'run_{datetime.now()}'
 
@@ -31,6 +35,7 @@ def get_model(hparams):
 
 def log(model, dataloader, prefix, hparams):
     model.eval()
+
     batch = next(iter(dataloader))
     batch = preprocess.strict_predict_all_tiles(batch)
 
@@ -44,8 +49,15 @@ def log(model, dataloader, prefix, hparams):
     logger.log_info(caption=name, info=info, prefix=prefix, idx=idx)
 
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
-    loss_mean = metrics.loss(model, dataloader)
-    model.train()
+
+    losses = []
+    for batch in tqdm(dataloader):
+        batch = preprocess.strict(batch)
+        with torch.no_grad():
+            loss, info = model.optim_step(batch)
+            losses.append(loss)
+
+    loss_mean = torch.Tensor(losses).mean()
 
     logger.log({
         f'{prefix}_loss_mean': loss_mean,
@@ -59,12 +71,10 @@ def log(model, dataloader, prefix, hparams):
     print(f'{prefix.upper()} SOLVED:', solved, flush=True)
     print('\n', flush=True)
 
+    model.train()
+
 
 def main(hparams):
-    import pprint
-    import sys
-    from tqdm import tqdm
-
     pp = pprint.PrettyPrinter(4)
     pp.pprint(vars(hparams))
 
@@ -100,7 +110,7 @@ def main(hparams):
     print('DEVICE:', DEVICE)
     print(f'## Start training with configuration "{hparams.model.upper()}"')
 
-    if not utils.IS_DEBUG:
+    if not config.IS_DEBUG:
         print('\n\nPress ENTER to continue')
         _ = input()
         print('...')
@@ -120,7 +130,7 @@ def main(hparams):
 
         tq_batches = tqdm(train_dl)
         for idx, batch in enumerate(tq_batches):
-            batch = preprocess.stochastic_all(batch)
+            batch = preprocess.stochastic_train(batch)
             loss, info = model.optim_step(batch)
 
             tq_batches.set_description(f'Loss: {loss:.6f}')

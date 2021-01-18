@@ -6,7 +6,7 @@ import torch
 import torch.utils.data as td
 from torch.nn.utils.rnn import pad_sequence
 
-import src.utils as utils
+import src.config as config
 import src.nn_utils as ut
 
 
@@ -31,7 +31,7 @@ def load_folder(path):
     file_names = os.listdir(path)
     # file_names = file_names[:8]
 
-    if utils.IS_DEBUG:
+    if config.IS_DEBUG:
         # limit files in debug mode
         file_names = file_names[:32]
 

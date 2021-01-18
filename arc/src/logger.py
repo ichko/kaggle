@@ -1,10 +1,10 @@
 import os
 import wandb
 
-import src.utils as utils
+import src.config as config
 import src.vis as vis
 
-if utils.IS_DEBUG:
+if config.IS_DEBUG:
     os.environ['WANDB_MODE'] = 'dryrun'
 
 

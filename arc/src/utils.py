@@ -2,8 +2,6 @@ import sys
 import os
 import torch
 
-IS_DEBUG = '--debug' in sys.argv
-
 # torch.autograd.set_detect_anomaly(True)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 

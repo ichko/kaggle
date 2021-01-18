@@ -27,14 +27,3 @@ def arc_eval(model, dataloader, num_iters):
             error += not equal
 
     return error / length, num_solved
-
-
-def loss(model, dataloader):
-    losses = []
-    for batch in tqdm(dataloader):
-        batch = preprocess.strict(batch)
-        with torch.no_grad():
-            loss, _ = model.optim_step(batch)
-            losses.append(loss)
-
-    return np.array(losses).mean()
