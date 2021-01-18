@@ -13,7 +13,7 @@
             "args": [
                 "--debug",
                 "--config",
-                "hyper_recurrent_cnn",
+                "default",
                 "--from-scratch",
             ],
             "console": "integratedTerminal"
