@@ -3,8 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import src.nn_utils as ut
-from src.models.soft_layer_hyper_conv import SoftLayerConv2D
-from src.models.soft_kernel_hyper_conv import SoftKernelConv2D
+from src.models.common.soft_kernel_hyper_conv import SoftKernelConv2D
 
 CHANNEL_DIM = 2
 
@@ -25,10 +24,6 @@ class CA(nn.Module):
             features_size=features, num_kernels=128,
             i=64, o=in_channels + self.latent_size, ks=3, p=1,
         )
-        # self.conv_1 = \
-        #     SoftLayerConv2D(num_kernels, i=num_hidden, o=64, ks=3, p=1)
-        # self.conv_2 = \
-        #     SoftLayerConv2D(num_kernels, i=64, o=num_hidden, ks=3, p=1)
 
         self.bn_1 = nn.BatchNorm2d(64)
 
