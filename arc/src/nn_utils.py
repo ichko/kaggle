@@ -119,6 +119,8 @@ def leaky():
 
 
 def unsqueeze_expand(tensor, dim, times):
+    if times == 0: return tensor
+
     tensor = tensor.unsqueeze(dim)
     new_shape = list(tensor.shape)
     new_shape[dim] = times
@@ -148,6 +150,21 @@ def cat_channels():
 
 def count_parameters(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
+
+
+class InferredConv2D(nn.Module):
+    def __init__(self, w, b, s=1, p=0):
+        super().__init__()
+        self.w = w
+        self.b = b
+        self.s = s
+        self.p = p
+
+    def forward(self, x, s=None, p=None):
+        s = self.s if s is None else s
+        p = self.p if p is None else p
+
+        return batch_conv(x, self.w, self.b, p=p, s=s)
 
 
 def batch_conv(x, w, b, p=0, s=1):
@@ -337,20 +354,7 @@ def compute_output_shape(net, frame_shape):
         t = torch.rand(1, *frame_shape)
         out = net(t)
 
-        return out.shape
-
-
-def extract_tensors(vec, tensor_shapes):
-    slice_indices = [0] + [np.prod(t) for t in tensor_shapes]
-    slice_indices = np.cumsum(slice_indices)
-
-    tensors = []
-    for i in range(len(slice_indices) - 1):
-        t = vec[:, slice_indices[i]:slice_indices[i + 1]]
-        t = t.reshape(-1, *tensor_shapes[i])
-        tensors.append(t)
-
-    return tensors
+    return out.shape
 
 
 def spatial_transformer(i, num_channels, only_translations=False):
@@ -489,11 +493,30 @@ def prepare_rnn_state(state, num_rnn_layers):
     )
 
 
-def unsqueeze_like(src, target):
-    diff = len(target.shape) - len(src.shape)
+def softmax_address(addresses, params_bank):
+    """
+        Used to address parameters from parameter bank in differentiable way
+        {addresses}   - (*A, num_params_in_bank)
+                        Last dim should be normalized (softmaxed)
+        {params_bank} - (num_params_in_bank, *B)
+        {return}      - (*A, *B)  
+    """
+    A = addresses.size()[:-1]
+    B = params_bank.size()[1:]
 
-    if diff <= 0: return src
-    return src[(..., ) + (None, ) * diff]
+    num_params_in_bank = addresses.size(-1)
+    flat_addresses = addresses.reshape(-1, num_params_in_bank)
+    flat_params_bank = params_bank.reshape(num_params_in_bank, -1)
+
+    flat_params_bank = unsqueeze_expand(
+        flat_params_bank,
+        dim=0,
+        times=flat_addresses.size(0),
+    )
+    flat_addresses = flat_addresses.unsqueeze(-1)
+    addressed_params = torch.sum(flat_params_bank * flat_addresses, dim=1)
+
+    return addressed_params.view(*A, *B)
 
 
 def time_distribute(module, input=None):

@@ -31,7 +31,7 @@ def log(dict):
     wandb.log(dict)
 
 
-def log_info(caption, info, prefix, idx=0):
+def log_info(caption, info, prefix, idx):
     length = info['test_len'][idx]
     inputs = info['test_in'][idx, :length]
     outputs = info['test_out'][idx, :length]
