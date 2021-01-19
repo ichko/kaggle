@@ -3,64 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import src.nn_utils as ut
-from src.models.common.soft_kernel_hyper_conv import SoftKernelConv2D
+from src.models.common.hyper_nets import HyperNCA
 
 CHANNEL_DIM = 2
-
-
-class CA(nn.Module):
-    def __init__(self, features, in_channels):
-        super().__init__()
-
-        self.in_channels = in_channels
-
-        self.latent_size = 21
-        # TODO: Write transformer indexing soft kernels Conv2D
-        self.conv_1 = SoftKernelConv2D( \
-            features_size=features, num_kernels=128,
-            i=in_channels + self.latent_size, o=64, ks=3, p=1,
-        )
-        self.conv_2 = SoftKernelConv2D( \
-            features_size=features, num_kernels=128,
-            i=64, o=in_channels + self.latent_size, ks=3, p=1,
-        )
-
-        self.bn_1 = nn.BatchNorm2d(64)
-
-    def forward(self, task_features, infer_inputs, num_iters):
-        self.conv_1.infer_params(task_features, infer_inputs)
-        self.conv_2.infer_params(task_features, infer_inputs)
-
-        def solve_task(x):
-            seq_shape = list(x.shape)
-            seq_shape.insert(1, num_iters)
-            seq = torch.zeros(seq_shape).to(x.device)
-
-            for i in range(num_iters):
-                x = self.conv_1(x)
-                # x = F.dropout(x, p=0.01, training=self.training)
-                x = self.bn_1(x)
-                x = F.leaky_relu(x, negative_slope=0.5)
-                x = self.conv_2(x)
-
-                # Softmax only the input channels
-                x[:, :self.in_channels] = \
-                    torch.softmax(x[:, :self.in_channels].clone(), dim=1)
-                x[:, self.in_channels:] = \
-                    torch.tanh(x[:, self.in_channels:].clone())
-
-                # x = torch.softmax(x, dim=1)
-                seq[:, i] = x
-
-            seq = seq[:, :, :self.in_channels]
-            return torch.log(seq)
-
-        new_shape = list(infer_inputs.shape)
-        new_shape[CHANNEL_DIM] += self.latent_size
-        new_input = torch.ones(*new_shape).to(infer_inputs.device)
-        new_input[:, :, :self.in_channels] = infer_inputs
-
-        return ut.time_distribute(solve_task, new_input)
 
 
 class HyperRecurrentCNN(ut.Module):
@@ -69,7 +14,7 @@ class HyperRecurrentCNN(ut.Module):
 
     def __init__(self, input_channels, num_iters):
         super().__init__()
-        features = 128
+        features = 32
         self.num_iters = num_iters
 
         self.task_feature_extract = ut.time_distribute(nn.Sequential(
@@ -87,8 +32,8 @@ class HyperRecurrentCNN(ut.Module):
             nn.Linear(128, features),
         ))
 
-        self.ca = CA(
-            features=features,
+        self.ca = HyperNCA(
+            feature_size=features,
             in_channels=input_channels,
         )
 

@@ -128,6 +128,13 @@ def main(hparams):
         device=DEVICE,
     )
 
+    test_dl = data.load_arc_data(
+        path='.data/test',
+        bs=hparams.bs,
+        shuffle=True,
+        device=DEVICE,
+    )
+
     model = get_model(hparams)
     model = model.to(DEVICE)
 
@@ -174,7 +181,7 @@ def main(hparams):
 
         if epoch % hparams.eval_interval == 0:
             log(model, train_dl, prefix='train', hparams=hparams)
-            log(model, val_dl, prefix='val', hparams=hparams)
+            # log(model, val_dl, prefix='val', hparams=hparams)
 
             model.persist()
 
