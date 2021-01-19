@@ -119,7 +119,11 @@ def load_arc_data(path, bs, shuffle, device='cpu'):
                 get(['train', 'input'], task, max_train_pairs)
             train_out, _ = get(['train', 'output'], task, max_train_pairs)
             test_in, test_len = get(['test', 'input'], task, max_test_pairs)
-            test_out, _ = get(['test', 'output'], task, max_test_pairs)
+
+            try:
+                test_out, _ = get(['test', 'output'], task, max_test_pairs)
+            except KeyError:
+                test_out = torch.Tensor([]).to(device)
 
             all_in = torch.cat([train_in[:train_len], test_in[:test_len]])
             all_out = torch.cat([train_out[:train_len], test_out[:test_len]])
