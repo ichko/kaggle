@@ -30,10 +30,10 @@ class LinearAddresser(nn.Module):
 
 
 class HyperConv2D(nn.Module):
-    def __init__(self, num_filters, ks):
+    def __init__(self, num_filters, address_size, ks):
         super().__init__()
+        self.address_size = address_size
 
-        self.num_filters = num_filters
         self.w_bank = nn.Parameter(torch.Tensor(num_filters, ks, ks))
         nn.init.kaiming_uniform_(self.w_bank, a=math.sqrt(5))
 
@@ -45,19 +45,23 @@ class HyperConv2D(nn.Module):
         self.w_bank.requires_grad = True
         self.b_bank.requires_grad = True
 
+        self.bank_addresser = ut.SoftAddressSpace(
+            num_addresses=num_filters,
+            address_size=address_size,
+        )
+
     def forward(self, addresses, s, p, seq_size=0):
+        """The actual tensor bank used to convolve the input is inferred.
+        Types:
+            addresses: (bs, out_channels + 1, in_channels, address_size)
+                       out_channels + 1 for the bias
         """
-            {addresses} - should be tensor with size
-                (bs, output_addresses + 1, input_addresses, num_filters)
-                output_addresses + 1 for the bias
-                The actual tensor bank used to convolve the input is inferred from the banks
-        """
-        assert addresses.size(-1) == self.num_filters
+        assert addresses.size(-1) == self.address_size
 
         w_addresses = addresses[:, :, 1:]
         b_addresses = addresses[:, :, 0]
-        w = ut.softmax_address(w_addresses, self.w_bank)
-        b = ut.softmax_address(b_addresses, self.b_bank)
+        w = self.bank_addresser(w_addresses, self.w_bank)
+        b = self.bank_addresser(b_addresses, self.b_bank)
 
         if seq_size > 0:
             w = ut.unsqueeze_expand(w, dim=1, times=seq_size)
@@ -69,12 +73,12 @@ class HyperConv2D(nn.Module):
         return ut.InferredConv2D(w, b, s, p)
 
 
-class HyperNCA(nn.Module):
+class HyperNCA(ut.Module):
     def __init__(self, feature_size, in_channels):
         super().__init__()
 
         # TODO: Write transformer indexing soft kernels Conv2D
-        self.address_size = 128
+        self.address_size = 16
         self.in_channels = in_channels
 
         self.middle_channels = 32
@@ -92,8 +96,15 @@ class HyperNCA(nn.Module):
             out_shape=(self.all_in_channels, self.middle_channels + 1),
             address_size=self.address_size,
         )
-        self.hyper_conv = HyperConv2D(num_filters=self.address_size, ks=3)
+        self.hyper_conv = HyperConv2D(
+            num_filters=512,
+            address_size=self.address_size,
+            ks=3,
+        )
+
         self.bn_1 = nn.BatchNorm2d(self.middle_channels)
+
+        self.summary()
 
     def forward(self, task_features, infer_inputs, num_iters):
         # TODO: This should be changed to something more expressive.
