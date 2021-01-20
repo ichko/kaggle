@@ -125,46 +125,33 @@ def soft_addressing(keys, address_space, bank):
     A = keys.size()[:-1]
     address_size = keys.size(-1)
 
-    flat_keys = keys.reshape(-1, address_size, 1)
-    expand_address_space = unsqueeze_expand(
-        address_space.T,
-        dim=0,
-        times=flat_keys.size(0),
-    )
-
-    selectors = torch.sum(flat_keys * expand_address_space, dim=1)
+    flat_keys = keys.reshape(-1, address_size)
+    selectors = torch.matmul(flat_keys, address_space.T)
     selectors = torch.softmax(selectors, dim=-1)
     selectors = selectors.view(*A, -1)
 
-    return select_from_bank(selectors, bank)
+    return generic_matmul(selectors, bank)
 
 
-def select_from_bank(selectors, bank):
-    """Used to address parameters from parameter bank in differentiable way.
+def generic_matmul(first, second):
+    """Matmul in the last dim.
     Types:
-        selectors: Tensor[*A, num_params_in_bank] - Last dim should be normalized (softmaxed)
-             bank: Tensor[num_params_in_bank, *B]
-           return: Tensor[*A, *B]
+         first: Tensor[*A,  N] - Last dim should be normalized (softmaxed)
+        second: Tensor[ N, *B]
+        return: Tensor[*A, *B]
     """
-    A = selectors.size()[:-1]
-    B = bank.size()[1:]
+    A = first.size()[:-1]
+    B = second.size()[1:]
+    N = first.size(-1)
 
-    num_params_in_bank = selectors.size(-1)
-    flat_addresses = selectors.reshape(-1, num_params_in_bank, 1)
-    flat_params_bank = bank.reshape(num_params_in_bank, -1)
+    flat_first = first.reshape(-1, N)
+    flat_second = second.reshape(N, -1)
 
-    flat_params_bank = unsqueeze_expand(
-        flat_params_bank,
-        dim=0,
-        times=flat_addresses.size(0),
-    )
-    addressed_params = torch.sum(flat_params_bank * flat_addresses, dim=1)
-
-    return addressed_params.view(*A, *B)
+    return torch.matmul(flat_first, flat_second).view(*A, *B)
 
 
 class SoftAddressSpace(nn.Module):
-    """This module gives you a way to address tenssors in differentiable way."""
+    """This module gives you a way to address tensors in differentiable way."""
     def __init__(self, num_addresses, address_size):
         super().__init__()
         self.address_space = nn.Parameter(
@@ -173,6 +160,7 @@ class SoftAddressSpace(nn.Module):
                 address_size,
             ))
         nn.init.normal_(self.address_space)
+        self.address_space.requires_grad = True
 
     def forward(self, selector, param_bank):
         """
