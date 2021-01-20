@@ -113,6 +113,77 @@ def fix_dim_size(tensor, size, dim, pad_value=0):
     return tensor
 
 
+def soft_addressing(keys, address_space, bank):
+    """Lets you address tensors from the bank addressed by address_space, using 
+    the keys.
+    Types:
+                 keys: Tensor[*A, address_size]
+        address_space: Tensor[num_addresses, address_size]
+                 bank: Tensor[num_addresses, *B]
+               return: Tensor[*A, *B]
+    """
+    A = keys.size()[:-1]
+    address_size = keys.size(-1)
+
+    flat_keys = keys.reshape(-1, address_size, 1)
+    expand_address_space = unsqueeze_expand(
+        address_space.T,
+        dim=0,
+        times=flat_keys.size(0),
+    )
+
+    selectors = torch.sum(flat_keys * expand_address_space, dim=1)
+    selectors = torch.softmax(selectors, dim=-1)
+    selectors = selectors.view(*A, -1)
+
+    return select_from_bank(selectors, bank)
+
+
+def select_from_bank(selectors, bank):
+    """Used to address parameters from parameter bank in differentiable way.
+    Types:
+        selectors: Tensor[*A, num_params_in_bank] - Last dim should be normalized (softmaxed)
+             bank: Tensor[num_params_in_bank, *B]
+           return: Tensor[*A, *B]
+    """
+    A = selectors.size()[:-1]
+    B = bank.size()[1:]
+
+    num_params_in_bank = selectors.size(-1)
+    flat_addresses = selectors.reshape(-1, num_params_in_bank, 1)
+    flat_params_bank = bank.reshape(num_params_in_bank, -1)
+
+    flat_params_bank = unsqueeze_expand(
+        flat_params_bank,
+        dim=0,
+        times=flat_addresses.size(0),
+    )
+    addressed_params = torch.sum(flat_params_bank * flat_addresses, dim=1)
+
+    return addressed_params.view(*A, *B)
+
+
+class SoftAddressSpace(nn.Module):
+    """This module gives you a way to address tenssors in differentiable way."""
+    def __init__(self, num_addresses, address_size):
+        super().__init__()
+        self.address_space = nn.Parameter(
+            torch.Tensor(
+                num_addresses,
+                address_size,
+            ))
+        nn.init.normal_(self.address_space)
+
+    def forward(self, selector, param_bank):
+        """
+        Types:
+              selector: Tensor[*A, address_size]
+            param_bank: Tensor[num_addresses, *B]
+                return: Tensor[*A, *B]
+        """
+        return soft_addressing(selector, self.address_space, param_bank)
+
+
 def leaky():
     LEAKY_SLOPE = 0.2
     return nn.LeakyReLU(LEAKY_SLOPE, inplace=True)
@@ -129,23 +200,6 @@ def unsqueeze_expand(tensor, dim, times):
 
 def reshape_in_time(tensor):
     return tensor.reshape(-1, *tensor.shape[2:])
-
-
-def cat_channels():
-    """
-        Concatenate number of channels in a single tensor
-        Converts tensor with shape:
-            (bs, num_channels, channel_size, h, w)
-        to tensor with shape:
-            (bs, num_channels * channel_size, h, w)
-    """
-    class CatChannels(nn.Module):
-        def forward(self, t):
-            shape = t.size()
-            cat_dim_size = shape[1] * shape[2]
-            return t.view(-1, cat_dim_size, *shape[3:])
-
-    return CatChannels()
 
 
 def count_parameters(module):
@@ -493,32 +547,6 @@ def prepare_rnn_state(state, num_rnn_layers):
     )
 
 
-def softmax_address(addresses, params_bank):
-    """
-        Used to address parameters from parameter bank in differentiable way
-        {addresses}   - (*A, num_params_in_bank)
-                        Last dim should be normalized (softmaxed)
-        {params_bank} - (num_params_in_bank, *B)
-        {return}      - (*A, *B)  
-    """
-    A = addresses.size()[:-1]
-    B = params_bank.size()[1:]
-
-    num_params_in_bank = addresses.size(-1)
-    flat_addresses = addresses.reshape(-1, num_params_in_bank)
-    flat_params_bank = params_bank.reshape(num_params_in_bank, -1)
-
-    flat_params_bank = unsqueeze_expand(
-        flat_params_bank,
-        dim=0,
-        times=flat_addresses.size(0),
-    )
-    flat_addresses = flat_addresses.unsqueeze(-1)
-    addressed_params = torch.sum(flat_params_bank * flat_addresses, dim=1)
-
-    return addressed_params.view(*A, *B)
-
-
 def time_distribute(module, input=None):
     """
     Distribute execution of module over batched sequential input tensor.
@@ -550,11 +578,6 @@ def time_distribute(module, input=None):
 
 class TimeDistributed(nn.Module):
     def __init__(self, module):
-        # IMPORTANT:
-        #   This init has to be here so that the
-        #   passed module parameters can be part of the
-        #   state (parameters) of the whole model.
-
         super().__init__()
         self.module = module
 
