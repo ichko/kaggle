@@ -95,6 +95,11 @@ def load_arc_data(path, bs, shuffle, device='cpu'):
     tasks_dict = normalize_obj(tasks_dict)
     tasks = list(tasks_dict.items())
 
+    # There are some tasks with more than one test pair in the train set!
+    # train_pairs_count = [len(t[1]['train']) for t in tasks]
+    # max_train_pairs = max(train_pairs_count)  # 10 on train set
+    # avg_train_pairs = np.mean(train_pairs_count)  # 3.2525 on train set
+
     max_train_pairs = 4  # demonstrations are padded to this
     max_test_pairs = 1
     seq_dim = 0
