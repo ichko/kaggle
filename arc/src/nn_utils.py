@@ -352,108 +352,6 @@ def deconv_block(i, o, ks, s, p, a=leaky(), d=1, bn=True):
     return nn.Sequential(*block)
 
 
-def stack_conv_blocks(block_ctor, sizes, ks, a, s, p):
-    layers = [
-        block_ctor(
-            i=sizes[l],
-            o=sizes[l + 1],
-            ks=ks,
-            s=s,
-            p=p,
-            a=(None if l == len(sizes) - 2 else a),
-            d=1,
-            # batch norm everywhere except the last layer
-            bn=(l != len(sizes) - 2),
-        ) for l in range(len(sizes) - 1)
-    ]
-
-    return nn.Sequential(*layers)
-
-
-def conv_encoder(sizes, ks=4, a=leaky()):
-    return stack_conv_blocks(conv_block, sizes, ks, a, s=2, p=ks // 2 - 1)
-
-
-def conv_transform(sizes, ks=5, s=1, a=leaky()):
-    return stack_conv_blocks(conv_block, sizes, ks, a, s, p=ks // 2)
-
-
-def conv_decoder(sizes, ks=4, s=2, a=leaky()):
-    return stack_conv_blocks(deconv_block, sizes, ks, a, s=s, p=ks // 2 - 1)
-
-
-class FlatToConv(nn.Module):
-    def __init__(self, channel_size, ks, s, a, p):
-        super().__init__()
-
-        def process_arg(*args):
-            return [
-                a if type(a) is list else [a] * (len(channel_size) - 1)
-                for a in args
-            ]
-
-        ks, s, a, p = process_arg(ks, s, a, p)
-
-        layers = []
-        layers_io = list(zip(channel_size, channel_size[1:]))
-        for idx, ((i, o), ks, s, a,
-                  p) in enumerate(zip(layers_io, ks, s, a, p)):
-            bn = idx < len(layers_io) - 1
-            l = deconv_block(i=i, o=o, ks=ks, s=s, p=p, a=a, bn=bn)
-            layers.append(l)
-
-        self.net = nn.Sequential(Reshape(-1, channel_size[0], 1, 1), *layers)
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class ConvToFlat(nn.Module):
-    def __init__(
-            self,
-            channel_sizes,
-            out_size,
-            ks=4,
-            s=2,
-            a=leaky(),
-    ):
-        super().__init__()
-        self.channel_sizes = channel_sizes
-        self.out_size = out_size
-        self.ks = ks
-        self.s = s
-        self.a = a
-
-    def forward(self, x):
-        if not hasattr(self, 'net'):
-            input_size = x.shape[-2:]
-            input_channels = self.channel_sizes[0]
-            self.encoder = conv_transform(self.channel_sizes, self.ks, self.s,
-                                          self.a)
-
-            self.encoder_out_shape = compute_output_shape(
-                self.encoder,
-                (input_channels, *input_size),
-            )
-
-            self.flat_encoder_out_size = np.prod(self.encoder_out_shape[-3:])
-
-            self.encoded_to_flat = nn.Sequential(
-                nn.Flatten(),
-                self.a,
-                nn.Linear(self.flat_encoder_out_size, self.out_size),
-            )
-
-            self.net = nn.Sequential(
-                self.encoder,
-                self.encoded_to_flat,
-            )
-
-            self.net.to(x.device)
-
-        return self.net(x)
-
-
 def compute_output_shape(net, frame_shape):
     with torch.no_grad():
         t = torch.rand(1, *frame_shape)
@@ -462,70 +360,67 @@ def compute_output_shape(net, frame_shape):
     return out.shape
 
 
-def spatial_transformer(i, num_channels, only_translations=False):
-    class SpatialTransformer(nn.Module):
-        def __init__(self):
-            super().__init__()
+class SpatialTransformer(nn.Module):
+    def __init__(self, i, num_channels, only_translations=False):
+        super().__init__()
 
-            self.num_channels = num_channels
-            self.locator = nn.Sequential(
-                nn.Linear(i, num_channels * 2 * 3),
-                Reshape(-1, 2, 3),
-            )
+        self.only_translations = only_translations
+        self.num_channels = num_channels
+        self.locator = nn.Sequential(
+            nn.Linear(i, num_channels * 2 * 3),
+            Reshape(-1, 2, 3),
+        )
 
-            self.device = self.locator[0].bias.device
-            # Taken from the pytorch spatial transformer tutorial.
-            self.locator[0].weight.data.zero_()
-            self.locator[0].bias.data.copy_(
-                torch.tensor(
-                    [1, 0, 0, 0, 1, 0] * num_channels,
-                    dtype=torch.float,
-                ).to(self.device))
+        self.device = self.locator[0].bias.device
+        # Taken from the pytorch spatial transformer tutorial.
+        self.locator[0].weight.data.zero_()
+        self.locator[0].bias.data.copy_(
+            torch.tensor(
+                [1, 0, 0, 0, 1, 0] * num_channels,
+                dtype=torch.float,
+            ).to(self.device))
 
-        def forward(self, x):
-            inp, tensor_3d = x
+    def forward(self, x):
+        inp, tensor_3d = x
 
-            theta = self.locator(inp)
-            _, C, H, W, = tensor_3d.shape
+        theta = self.locator(inp)
+        _, C, H, W, = tensor_3d.shape
 
-            if only_translations:
-                theta[:, :, :-1] = torch.tensor(
-                    [[1, 0], [0, 1]],
-                    dtype=torch.float,
-                ).to(self.device).unsqueeze_(0)
+        if self.only_translations:
+            theta[:, :, :-1] = torch.tensor(
+                [[1, 0], [0, 1]],
+                dtype=torch.float,
+            ).to(self.device).unsqueeze_(0)
 
-            grid = F.affine_grid(
-                theta,
-                (theta.size(dim=0), 1, H, W),
-                align_corners=True,
-            )
+        grid = F.affine_grid(
+            theta,
+            (theta.size(dim=0), 1, H, W),
+            align_corners=True,
+        )
 
-            # Last values
-            self.grid = grid
-            self.theta = theta
+        # Last values
+        self.grid = grid
+        self.theta = theta
 
-            tensor_3d = tensor_3d.reshape(-1, 1, H, W)
-            tensor_3d = F.grid_sample(
-                tensor_3d,
-                grid,
-                align_corners=True,
-            )
+        tensor_3d = tensor_3d.reshape(-1, 1, H, W)
+        tensor_3d = F.grid_sample(
+            tensor_3d,
+            grid,
+            align_corners=True,
+        )
 
-            return tensor_3d.reshape(-1, C, H, W)
-
-    return SpatialTransformer()
+        return tensor_3d.reshape(-1, C, H, W)
 
 
 def one_hot(tensor, num_classes, dim):
     tensor = F.one_hot(tensor.long(), num_classes=num_classes).float()
-    permute = list(range(tensor.dim()))
-    # Place last dim (one-hot) on the desired position
-    last_dim = permute.pop()
-    permute.insert(dim, last_dim)
-    # Move the one hot encoded dimension in the channel dim
-    tensor = tensor.permute(permute)
+    dim_permutation = list(range(tensor.dim()))
+    last_dim = dim_permutation.pop()
 
-    return tensor
+    # Place last dim (one-hot) on the desired position
+    dim_permutation.insert(dim, last_dim)
+
+    return tensor.permute(dim_permutation)
 
 
 def sample_dim(tensor, n, dim, dim_size=None):
@@ -561,6 +456,7 @@ def sample_padded_sequences(sequences, lens, sample_size):
 
 
 def mask_seq_from_lens(tensor, lens):
+    # SRC - <https://stackoverflow.com/a/53403392>
     seq_dim = 1
     mask = torch.arange(tensor.size(seq_dim))[None, :] < lens[:, None]
     mask = mask.reshape(*mask.shape, *([1] * (len(tensor.shape) - 2)))
