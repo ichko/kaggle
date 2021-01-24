@@ -72,8 +72,6 @@ def stochastic_all(batch):
     return _stochastic(X['len'], X['in'], X['out'])
 
 
-# TODO: Use this preprocessor while training to see if unseen test tiles
-# are solved during evaluation
 def stochastic_train(batch, max_train=3, max_test=2):
     X, _ = batch
     return _stochastic(X['train_len'], X['train_in'], X['train_out'])

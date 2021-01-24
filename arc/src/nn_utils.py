@@ -1,4 +1,5 @@
 import os
+import math
 
 import numpy as np
 
@@ -92,6 +93,106 @@ class Module(nn.Module):
         return next(self.parameters()).device
 
 
+class SoftAddressSpace(nn.Module):
+    """This module gives you a way to address tensors in differentiable way."""
+    def __init__(self, num_addresses, address_size):
+        super().__init__()
+        self.address_space = nn.Parameter(
+            torch.Tensor(
+                num_addresses,
+                address_size,
+            ))
+        nn.init.normal_(self.address_space)
+        self.address_space.requires_grad = True
+
+    def forward(self, selector, param_bank):
+        """
+        Types:
+              selector: Tensor[*A, address_size]
+            param_bank: Tensor[num_addresses, *B]
+                return: Tensor[*A, *B]
+        """
+        return soft_addressing(selector, self.address_space, param_bank)
+
+
+class InferredConv2D(nn.Module):
+    def __init__(self, w, b, s=1, p=0):
+        super().__init__()
+        self.w = w
+        self.b = b
+        self.s = s
+        self.p = p
+
+    def forward(self, x, s=None, p=None):
+        s = self.s if s is None else s
+        p = self.p if p is None else p
+
+        return batch_conv(x, self.w, self.b, p=p, s=s)
+
+
+class HyperConvFilter2D(nn.Module):
+    def __init__(self, num_filters, address_size, ks):
+        super().__init__()
+        self.address_size = address_size
+
+        self.w_bank = nn.Parameter(torch.Tensor(num_filters, ks, ks))
+        nn.init.kaiming_uniform_(self.w_bank, a=math.sqrt(5))
+
+        self.b_bank = nn.Parameter(torch.Tensor(num_filters))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.w_bank[0])
+        bound = 1 / math.sqrt(fan_in)
+        nn.init.uniform_(self.b_bank, -bound, bound)
+
+        self.w_bank.requires_grad = True
+        self.b_bank.requires_grad = True
+
+        self.bank_addresser = SoftAddressSpace(
+            num_addresses=num_filters,
+            address_size=address_size,
+        )
+
+    def forward(self, addresses, s, p, seq_size=0):
+        """The actual tensor bank used to convolve the input is inferred.
+        Types:
+            addresses: (bs, out_channels + 1, in_channels, address_size)
+                       out_channels + 1 for the bias
+        """
+        assert addresses.size(-1) == self.address_size
+
+        w_addresses = addresses[:, :, 1:]
+        b_addresses = addresses[:, :, 0]
+        w = self.bank_addresser(w_addresses, self.w_bank)
+        b = self.bank_addresser(b_addresses, self.b_bank)
+
+        if seq_size > 0:
+            w = unsqueeze_expand(w, dim=1, times=seq_size)
+            b = unsqueeze_expand(b, dim=1, times=seq_size)
+
+            w = reshape_in_time(w)
+            b = reshape_in_time(b)
+
+        return InferredConv2D(w, b, s, p)
+
+
+class LinearAddresser(nn.Module):
+    def __init__(self, in_features_size, out_shape, address_size):
+        super().__init__()
+        self.num_addresses = np.prod(out_shape)
+        self.out_shape = out_shape
+        self.address_size = address_size
+
+        self.dense = nn.Linear(
+            in_features_size,
+            address_size * self.num_addresses,
+        )
+
+    def forward(self, x):
+        x = self.dense(x)
+        x = x.view(-1, *self.out_shape, self.address_size)
+        x = torch.softmax(x, dim=-1)
+        return x
+
+
 def pad_in_dim(tensor, pad_size, dim, val=0):
     shape = list(tensor.shape)
     shape[dim] = pad_size - shape[dim]
@@ -101,7 +202,7 @@ def pad_in_dim(tensor, pad_size, dim, val=0):
     return out
 
 
-# Trim and or slice tensor
+# Trim and/or slice tensor
 def fix_dim_size(tensor, size, dim, pad_value=0):
     # Slice only dim
     indices = {dim: slice(0, size)}
@@ -150,31 +251,8 @@ def generic_matmul(first, second):
     return torch.matmul(flat_first, flat_second).view(*A, *B)
 
 
-class SoftAddressSpace(nn.Module):
-    """This module gives you a way to address tensors in differentiable way."""
-    def __init__(self, num_addresses, address_size):
-        super().__init__()
-        self.address_space = nn.Parameter(
-            torch.Tensor(
-                num_addresses,
-                address_size,
-            ))
-        nn.init.normal_(self.address_space)
-        self.address_space.requires_grad = True
-
-    def forward(self, selector, param_bank):
-        """
-        Types:
-              selector: Tensor[*A, address_size]
-            param_bank: Tensor[num_addresses, *B]
-                return: Tensor[*A, *B]
-        """
-        return soft_addressing(selector, self.address_space, param_bank)
-
-
-def leaky():
-    LEAKY_SLOPE = 0.2
-    return nn.LeakyReLU(LEAKY_SLOPE, inplace=True)
+def leaky(slope=0.2):
+    return nn.LeakyReLU(slope, inplace=True)
 
 
 def unsqueeze_expand(tensor, dim, times):
@@ -192,21 +270,6 @@ def reshape_in_time(tensor):
 
 def count_parameters(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
-
-
-class InferredConv2D(nn.Module):
-    def __init__(self, w, b, s=1, p=0):
-        super().__init__()
-        self.w = w
-        self.b = b
-        self.s = s
-        self.p = p
-
-    def forward(self, x, s=None, p=None):
-        s = self.s if s is None else s
-        p = self.p if p is None else p
-
-        return batch_conv(x, self.w, self.b, p=p, s=s)
 
 
 def batch_conv(x, w, b, p=0, s=1):

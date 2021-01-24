@@ -10,69 +10,6 @@ import src.nn_utils as ut
 CHANNEL_DIM = 2
 
 
-class LinearAddresser(nn.Module):
-    def __init__(self, in_features_size, out_shape, address_size):
-        super().__init__()
-        self.num_addresses = np.prod(out_shape)
-        self.out_shape = out_shape
-        self.address_size = address_size
-
-        self.dense = nn.Linear(
-            in_features_size,
-            address_size * self.num_addresses,
-        )
-
-    def forward(self, x):
-        x = self.dense(x)
-        x = x.view(-1, *self.out_shape, self.address_size)
-        x = torch.softmax(x, dim=-1)
-        return x
-
-
-class HyperConv2D(nn.Module):
-    def __init__(self, num_filters, address_size, ks):
-        super().__init__()
-        self.address_size = address_size
-
-        self.w_bank = nn.Parameter(torch.Tensor(num_filters, ks, ks))
-        nn.init.kaiming_uniform_(self.w_bank, a=math.sqrt(5))
-
-        self.b_bank = nn.Parameter(torch.Tensor(num_filters))
-        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.w_bank[0])
-        bound = 1 / math.sqrt(fan_in)
-        nn.init.uniform_(self.b_bank, -bound, bound)
-
-        self.w_bank.requires_grad = True
-        self.b_bank.requires_grad = True
-
-        self.bank_addresser = ut.SoftAddressSpace(
-            num_addresses=num_filters,
-            address_size=address_size,
-        )
-
-    def forward(self, addresses, s, p, seq_size=0):
-        """The actual tensor bank used to convolve the input is inferred.
-        Types:
-            addresses: (bs, out_channels + 1, in_channels, address_size)
-                       out_channels + 1 for the bias
-        """
-        assert addresses.size(-1) == self.address_size
-
-        w_addresses = addresses[:, :, 1:]
-        b_addresses = addresses[:, :, 0]
-        w = self.bank_addresser(w_addresses, self.w_bank)
-        b = self.bank_addresser(b_addresses, self.b_bank)
-
-        if seq_size > 0:
-            w = ut.unsqueeze_expand(w, dim=1, times=seq_size)
-            b = ut.unsqueeze_expand(b, dim=1, times=seq_size)
-
-            w = ut.reshape_in_time(w)
-            b = ut.reshape_in_time(b)
-
-        return ut.InferredConv2D(w, b, s, p)
-
-
 class HyperNCA(ut.Module):
     def __init__(self, feature_size, in_channels):
         super().__init__()
@@ -81,8 +18,8 @@ class HyperNCA(ut.Module):
         self.address_size = 16
         self.in_channels = in_channels
 
-        self.middle_channels = 32
-        self.all_in_channels = 32
+        self.middle_channels = 128
+        self.all_in_channels = 16
         self.latent_channels = self.all_in_channels - in_channels
 
         # +1 for dimensions picking the biases
@@ -96,15 +33,13 @@ class HyperNCA(ut.Module):
             out_shape=(self.all_in_channels, self.middle_channels + 1),
             address_size=self.address_size,
         )
-        self.hyper_conv = HyperConv2D(
-            num_filters=512,
+        self.hyper_conv = ut.HyperConvFilter2D(
+            num_filters=1024,
             address_size=self.address_size,
             ks=3,
         )
 
         self.bn_1 = nn.BatchNorm2d(self.middle_channels)
-
-        self.summary()
 
     def forward(self, task_features, infer_inputs, num_iters):
         # TODO: This should be changed to something more expressive.
@@ -143,7 +78,7 @@ class HyperNCA(ut.Module):
 
         new_shape = list(infer_inputs.shape)
         new_shape[CHANNEL_DIM] += self.latent_channels
-        new_input = torch.ones(*new_shape).to(infer_inputs.device)
+        new_input = torch.zeros(*new_shape).to(infer_inputs.device)
         new_input[:, :, :self.in_channels] = infer_inputs
 
         return ut.time_distribute(solve_task, new_input)
