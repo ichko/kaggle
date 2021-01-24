@@ -16,6 +16,8 @@ configs = [
         'model': 'hyper_recurrent_cnn',
         'nca_iterations': 10,
         'input_channels': 11,
+        'num_train_samples': 3,
+        'num_test_samples': 2,
     },
 ]
 

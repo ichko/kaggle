@@ -173,7 +173,11 @@ def main(hparams):
 
         tq_batches = tqdm(train_dl)
         for idx, batch in enumerate(tq_batches):
-            batch = preprocess.stochastic_train(batch)
+            batch = preprocess.stochastic_train(
+                batch,
+                num_train_samples=hparams.num_train_samples,
+                num_test_samples=hparams.num_test_samples,
+            )
             loss, info = model.optim_step(batch)
 
             tq_batches.set_description(f'Loss: {loss:.6f}')

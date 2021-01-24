@@ -46,13 +46,17 @@ def strict_predict_all_tiles(batch):
     }, y
 
 
-def _stochastic(lens, input, output, max_train=3, max_test=2):
+def _stochastic(lens, input, output, num_train_samples, num_test_samples):
     input = ut.one_hot(input, NUM_CLASSES, CHANNEL_DIM)
     output = ut.one_hot(output, NUM_CLASSES, CHANNEL_DIM)
     pairs = torch.cat([input, output], dim=CHANNEL_DIM)
 
-    train, train_len = ut.sample_padded_sequences(pairs, lens, max_train)
-    test, test_len = ut.sample_padded_sequences(pairs, lens, max_test)
+    train, train_len = ut.sample_padded_sequences(
+        pairs,
+        lens,
+        num_train_samples,
+    )
+    test, test_len = ut.sample_padded_sequences(pairs, lens, num_test_samples)
 
     test_in, test_out = test.chunk(2, dim=CHANNEL_DIM)
     y = torch.argmax(test_out, dim=CHANNEL_DIM)
@@ -67,11 +71,23 @@ def _stochastic(lens, input, output, max_train=3, max_test=2):
     }, y
 
 
-def stochastic_all(batch):
+def stochastic_all(batch, num_train_samples, num_test_samples):
     X, _ = batch
-    return _stochastic(X['len'], X['in'], X['out'])
+    return _stochastic(
+        lens=X['len'],
+        input=X['in'],
+        output=X['out'],
+        num_train_samples=num_train_samples,
+        num_test_samples=num_test_samples,
+    )
 
 
-def stochastic_train(batch, max_train=3, max_test=2):
+def stochastic_train(batch, num_train_samples, num_test_samples):
     X, _ = batch
-    return _stochastic(X['train_len'], X['train_in'], X['train_out'])
+    return _stochastic(
+        lens=X['train_len'],
+        input=X['train_in'],
+        output=X['train_out'],
+        num_train_samples=num_train_samples,
+        num_test_samples=num_test_samples,
+    )

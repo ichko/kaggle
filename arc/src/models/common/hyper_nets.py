@@ -23,12 +23,12 @@ class HyperNCA(ut.Module):
         self.latent_channels = self.all_in_channels - in_channels
 
         # +1 for dimensions picking the biases
-        self.addresser_1 = LinearAddresser(
+        self.addresser_1 = ut.LinearAddresser(
             feature_size,
             out_shape=(self.middle_channels, self.all_in_channels + 1),
             address_size=self.address_size,
         )
-        self.addresser_2 = LinearAddresser(
+        self.addresser_2 = ut.LinearAddresser(
             feature_size,
             out_shape=(self.all_in_channels, self.middle_channels + 1),
             address_size=self.address_size,
