@@ -3,12 +3,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import src.nn_utils as ut
-from src.models.common.hyper_nets import HyperNCA
+from src.models.hyper_nca import HyperNCA
 
 CHANNEL_DIM = 2
 
 
-class HyperRecurrentCNN(ut.Module):
+def make_model(hparams):
+    return ConvProgrammableNCA(
+        input_channels=hparams['input_channels'],
+        num_iters=hparams['nca_iterations'],
+    )
+
+
+def sanity_check():
+    pass
+
+
+class ConvProgrammableNCA(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
 
@@ -122,14 +133,3 @@ class HyperRecurrentCNN(ut.Module):
             'test_pred_seq': y_pred_seq,
             'batch_losses': batch_losses,
         }
-
-
-def make_model(hparams):
-    return HyperRecurrentCNN(
-        input_channels=hparams['input_channels'],
-        num_iters=hparams['nca_iterations'],
-    )
-
-
-def sanity_check():
-    pass

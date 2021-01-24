@@ -13,7 +13,7 @@ defaults = {
 
 configs = [
     {
-        'model': 'hyper_recurrent_cnn',
+        'model': 'conv_programmable_nca',
         'nca_iterations': 10,
         'input_channels': 11,
         'num_train_samples': 3,
