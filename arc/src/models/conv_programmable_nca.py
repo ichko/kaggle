@@ -127,11 +127,8 @@ class ConvProgrammableNCA(ut.Module):
         y_pred_seq = y_pred.argmax(dim=CHANNEL_DIM + 1)
         y_pred_last = y_pred_seq[:, :, -1]
 
-        return loss.item(), {
+        return {
             'loss': loss,
-            'test_len': X['test_len'],
-            'test_in': X['test_in'].argmax(dim=CHANNEL_DIM),
-            'test_out': y,
             'test_pred': y_pred_last,
             'test_pred_seq': y_pred_seq,
             'batch_losses': batch_losses,
