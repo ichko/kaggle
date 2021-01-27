@@ -10,7 +10,8 @@ import src.logger as logger
 import src.config as config
 import src.utils as utils
 import src.metrics as metrics
-import src.preprocess as preprocess
+import src.data.preprocess as preprocess
+import src.data.postprocess as postprocess
 
 import matplotlib.pyplot as plt
 import torch
@@ -35,14 +36,15 @@ def get_model(hparams):
 
 
 def log(model, dataloader, prefix, hparams):
+    # TODO: This needs some refactoring
     model.eval()
-
-    batch = next(iter(dataloader))
-    batch = preprocess.strict_predict_all_tiles(batch)
 
     # Log example task
     with torch.no_grad():
-        _loss, info = model.optim_step(batch)
+        batch = next(iter(dataloader))
+        batch = preprocess.strict_predict_all_tiles(batch)
+        info = model.optim_step(batch)
+        info = postprocess.standard(batch, info)
 
     idx = 0
     X, _y = batch
@@ -50,38 +52,22 @@ def log(model, dataloader, prefix, hparams):
     logger.log_info(caption=name, info=info, prefix=prefix, idx=idx)
 
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
+    with torch.no_grad():
+        epoch_info = model.optim_epoch(
+            dataloader,
+            preprocess=preprocess.strict,
+            postprocess=postprocess.standard,
+            verbose=True,
+        )
 
-    losses = []
-    task_losses = []
-    infos = []
-    names = []
-    for batch in tqdm(dataloader):
-        batch = preprocess.strict(batch)
-        X, _ = batch
-        names.extend(X['name'])
-        with torch.no_grad():
-            loss, info = model.optim_step(batch)
-            losses.append(loss)
+    infos = epoch_info['infos']
+    names = infos['name']
+    loss_mean = epoch_info['loss_mean']
+    loss_sort_index = epoch_info['loss_sort_index']
 
-            infos.append(info)
-            task_losses.append(info['batch_losses'])
-
-    task_losses = torch.cat(task_losses)
-    loss_sort_index = task_losses.argsort()
-
-    names = np.array(names)[loss_sort_index.tolist()]
-    infos = {
-        'test_len':
-        torch.cat([i['test_len'] for i in infos])[loss_sort_index],
-        'test_in':
-        torch.cat([i['test_in'] for i in infos])[loss_sort_index],
-        'test_out':
-        torch.cat([i['test_out'] for i in infos])[loss_sort_index],
-        'test_pred_seq':
-        torch.cat([i['test_pred_seq'] for i in infos])[loss_sort_index],
-        'test_pred':
-        torch.cat([i['test_pred'] for i in infos])[loss_sort_index],
-    }
+    for desc in \
+        ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
+        infos[desc] = infos[desc][loss_sort_index]
 
     for desc, idx in zip(['best', 'middle', 'worst'],
                          [0, len(infos['test_len']) // 2, -1]):
@@ -94,7 +80,6 @@ def log(model, dataloader, prefix, hparams):
             idx=idx,
         )
 
-    loss_mean = torch.Tensor(losses).mean()
     logger.log({
         f'{prefix}_loss_mean': loss_mean,
         f'{prefix}_score': score,
@@ -178,7 +163,8 @@ def main(hparams):
                 num_train_samples=hparams.num_train_samples,
                 num_test_samples=hparams.num_test_samples,
             )
-            loss, info = model.optim_step(batch)
+            info = model.optim_step(batch)
+            loss = info['loss']
 
             tq_batches.set_description(f'Loss: {loss:.6f}')
             logger.log({'train_loss': loss})
