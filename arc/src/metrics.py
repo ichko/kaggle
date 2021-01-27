@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-import src.preprocess as preprocess
+import src.data.preprocess as preprocess
 
 
 # https://www.kaggle.com/c/abstraction-and-reasoning-challenge/overview/evaluation
