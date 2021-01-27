@@ -1,11 +1,14 @@
 import os
 import math
+from collections import defaultdict
 
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from tqdm import tqdm
 
 
 class Module(nn.Module):
@@ -38,33 +41,6 @@ class Module(nn.Module):
     def metrics(self, _loss, _info):
         return {}
 
-    def optim_step(self, batch, optim_kw={}):
-        X, y = batch
-
-        y_pred = self.optim_forward(X)
-        loss = self.criterion(y_pred, y)
-
-        if loss.requires_grad:
-            if not hasattr(self, 'optim'):
-                self.configure_optim(**optim_kw)
-
-            self.optim.zero_grad()
-            loss.backward()
-            self.optim.step()
-
-        metrics = self.metrics(loss.item(), {
-            'X': X,
-            'y_pred': y_pred,
-            'y': y,
-        })
-
-        return loss.item(), {
-            'metrics': metrics,
-            'X': X,
-            'y_pred': y_pred,
-            'y': y,
-        }
-
     def set_requires_grad(self, value):
         for param in self.parameters():
             param.requires_grad = value
@@ -91,6 +67,77 @@ class Module(nn.Module):
     @property
     def device(self):
         return next(self.parameters()).device
+
+    def optim_step(self, batch):
+        X, y = batch
+
+        y_pred = self.optim_forward(X)
+        loss = self.criterion(y_pred, y)
+
+        if loss.requires_grad:
+            self.optim.zero_grad()
+            loss.backward()
+            self.optim.step()
+
+        metrics = self.metrics({
+            'loss': loss,
+            'X': X,
+            'y': y,
+            'y_pred': y_pred,
+        })
+
+        return {
+            'metrics': metrics,
+            'loss': loss,
+            'y_pred': y_pred,
+        }
+
+    def optim_epoch(self, dataloader, preprocess, postprocess, verbose=True):
+        loss_mean = []
+        all_losses = []
+        infos = []
+
+        batches = tqdm(dataloader) if verbose else dataloader
+        for batch in batches:
+            batch = preprocess(batch)
+            info = self.optim_step(batch)
+            info = postprocess(batch, info)
+
+            loss_mean.append(info['loss'].item())
+            infos.append(info)
+            if 'batch_losses' in info:
+                all_losses.append(info['batch_losses'])
+
+        loss_mean = torch.Tensor(loss_mean).mean()
+        all_losses = torch.cat(all_losses)
+        loss_sort_index = all_losses.argsort()
+
+        return {
+            'infos': merge_dicts(infos),
+            'loss_mean': loss_mean,
+            'loss_sort_index': loss_sort_index,
+            'all_losses': all_losses,
+        }
+
+
+def merge_dicts(dicts):
+    combined = defaultdict(lambda: [])
+    for d in dicts:
+        for k, v in d.items():
+            combined[k].append(v)
+
+    result = {}
+
+    for k, v in combined.items():
+        try:
+            result[k] = torch.cat(v)
+        except Exception:
+            try:
+                result[k] = np.concatenate(v)
+            except Exception:
+                result[k] = v
+
+    return result
 
 
 class SoftAddressSpace(nn.Module):
