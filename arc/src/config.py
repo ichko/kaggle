@@ -16,8 +16,8 @@ configs = [
         'model': 'conv_programmable_nca',
         'nca_iterations': 10,
         'input_channels': 11,
-        'num_train_samples': 3,
-        'num_test_samples': 2,
+        'num_train_samples': 2,
+        'num_test_samples': 3,
     },
 ]
 
