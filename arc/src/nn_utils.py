@@ -131,14 +131,19 @@ class InferredConv2D(nn.Module):
 
 
 class HyperConvFilter2D(nn.Module):
-    def __init__(self, num_filters, address_size, ks):
+    def __init__(self, bank_params, address_size, conv_volume):
+        """
+        Types:
+            conv_volume: tuple(out_channels?, in_channels?, k_w?, k_h)
+        """
         super().__init__()
         self.address_size = address_size
+        self.conv_volume = conv_volume
 
-        self.w_bank = nn.Parameter(torch.Tensor(num_filters, ks, ks))
+        self.w_bank = nn.Parameter(torch.Tensor(bank_params, *conv_volume))
         nn.init.kaiming_uniform_(self.w_bank, a=math.sqrt(5))
 
-        self.b_bank = nn.Parameter(torch.Tensor(num_filters))
+        self.b_bank = nn.Parameter(torch.Tensor(bank_params))
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.w_bank[0])
         bound = 1 / math.sqrt(fan_in)
         nn.init.uniform_(self.b_bank, -bound, bound)
@@ -147,22 +152,21 @@ class HyperConvFilter2D(nn.Module):
         self.b_bank.requires_grad = True
 
         self.bank_addresser = SoftAddressSpace(
-            num_addresses=num_filters,
+            num_addresses=bank_params,
             address_size=address_size,
         )
 
-    def forward(self, addresses, s, p, seq_size=0):
+    def forward(self, w_addr, b_addr, s, p, seq_size=0):
         """The actual tensor bank used to convolve the input is inferred.
         Types:
-            addresses: (bs, out_channels + 1, in_channels, address_size)
-                       out_channels + 1 for the bias
+            w_addr: Tensor[bs, *conv_volume , address_size]
+            b_addr: Tensor[bs,  out_channels, address_size]
         """
-        assert addresses.size(-1) == self.address_size
+        assert w_addr.size(-1) == self.address_size
+        assert b_addr.size(-1) == self.address_size
 
-        w_addresses = addresses[:, :, 1:]
-        b_addresses = addresses[:, :, 0]
-        w = self.bank_addresser(w_addresses, self.w_bank)
-        b = self.bank_addresser(b_addresses, self.b_bank)
+        w = self.bank_addresser(w_addr, self.w_bank)
+        b = self.bank_addresser(b_addr, self.b_bank)
 
         if seq_size > 0:
             w = unsqueeze_expand(w, dim=1, times=seq_size)
