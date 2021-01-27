@@ -39,18 +39,6 @@ def log(model, dataloader, prefix, hparams):
     # TODO: This needs some refactoring
     model.eval()
 
-    # Log example task
-    with torch.no_grad():
-        batch = next(iter(dataloader))
-        batch = preprocess.strict_predict_all_tiles(batch)
-        info = model.optim_step(batch)
-        info = postprocess.standard(batch, info)
-
-    idx = 0
-    X, _y = batch
-    name = X['name'][idx]
-    logger.log_info(caption=name, info=info, prefix=prefix, idx=idx)
-
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
     with torch.no_grad():
         epoch_info = model.optim_epoch(
@@ -65,13 +53,20 @@ def log(model, dataloader, prefix, hparams):
     loss_mean = epoch_info['loss_mean']
     loss_sort_index = epoch_info['loss_sort_index']
 
+    idx = 0
+    logger.log_info(
+        caption=infos['name'][idx],
+        info=infos,
+        prefix=prefix,
+        idx=idx,
+    )
+
     for desc in \
         ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
         infos[desc] = infos[desc][loss_sort_index]
 
     for desc, idx in zip(['best', 'middle', 'worst'],
                          [0, len(infos['test_len']) // 2, -1]):
-        X, _y = batch
         name = names[idx]
         logger.log_info(
             caption=name,
