@@ -12,6 +12,8 @@ def make_model(hparams):
     return ConvProgrammableNCA(
         input_channels=hparams['input_channels'],
         num_iters=hparams['nca_iterations'],
+        # TODO: Refactor
+        num_tasks=400,
     )
 
 
@@ -26,10 +28,16 @@ class ConvProgrammableNCA(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
 
-    def __init__(self, input_channels, num_iters):
+    def __init__(self, num_tasks, input_channels, num_iters):
         super().__init__()
         features = 32
         self.num_iters = num_iters
+
+        # self.embedding = nn.Embedding(
+        #     num_embeddings=num_tasks,
+        #     embedding_dim=features,
+        # )
+        # self.task_feature_extract = self.embedding
 
         self.task_feature_extract = ut.time_distribute(nn.Sequential(
             ut.conv_block(

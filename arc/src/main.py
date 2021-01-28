@@ -36,22 +36,21 @@ def get_model(hparams):
 
 
 def log(model, dataloader, prefix, hparams):
-    # TODO: This needs some refactoring
     model.eval()
 
     score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
     with torch.no_grad():
         epoch_info = model.optim_epoch(
             dataloader,
-            preprocess=preprocess.strict,
+            preprocess=preprocess.strict_predict_all_tiles,
             postprocess=postprocess.standard,
             verbose=True,
         )
 
     infos = epoch_info['infos']
-    names = infos['name']
     loss_mean = epoch_info['loss_mean']
     loss_sort_index = epoch_info['loss_sort_index']
+    names = infos['name']
 
     idx = 0
     logger.log_info(
@@ -63,6 +62,7 @@ def log(model, dataloader, prefix, hparams):
 
     for desc in \
         ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
+        # TODO: Problem with batched loss sort index
         infos[desc] = infos[desc][loss_sort_index]
 
     for desc, idx in zip(['best', 'middle', 'worst'],

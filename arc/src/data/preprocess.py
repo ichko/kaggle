@@ -17,6 +17,7 @@ def strict(batch):
     train = torch.cat([train_in, train_out], dim=CHANNEL_DIM)
 
     return {
+        'idx': X['idx'],
         'name': X['name'],
         'train_len': X['train_len'],
         'test_len': X['test_len'],
@@ -37,6 +38,7 @@ def strict_predict_all_tiles(batch):
     y = X['out'].long()
 
     return {
+        'idx': X['idx'],
         'name': X['name'],
         'train_len': X['train_len'],
         'test_len': X['len'],
@@ -46,7 +48,14 @@ def strict_predict_all_tiles(batch):
     }, y
 
 
-def _stochastic(lens, input, output, num_train_samples, num_test_samples):
+def _stochastic(
+    lens,
+    idx,
+    input,
+    output,
+    num_train_samples,
+    num_test_samples,
+):
     input = ut.one_hot(input, NUM_CLASSES, CHANNEL_DIM)
     output = ut.one_hot(output, NUM_CLASSES, CHANNEL_DIM)
     pairs = torch.cat([input, output], dim=CHANNEL_DIM)
@@ -62,6 +71,7 @@ def _stochastic(lens, input, output, num_train_samples, num_test_samples):
     y = torch.argmax(test_out, dim=CHANNEL_DIM)
 
     return {
+        'idx': idx,
         'name': None,
         'train_len': train_len,
         'test_len': test_len,
@@ -74,6 +84,7 @@ def _stochastic(lens, input, output, num_train_samples, num_test_samples):
 def stochastic_all(batch, num_train_samples, num_test_samples):
     X, _ = batch
     return _stochastic(
+        idx=X['idx'],
         lens=X['len'],
         input=X['in'],
         output=X['out'],
@@ -85,6 +96,7 @@ def stochastic_all(batch, num_train_samples, num_test_samples):
 def stochastic_train(batch, num_train_samples, num_test_samples):
     X, _ = batch
     return _stochastic(
+        idx=X['idx'],
         lens=X['train_len'],
         input=X['train_in'],
         output=X['train_out'],
