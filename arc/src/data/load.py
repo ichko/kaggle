@@ -139,6 +139,7 @@ def load_arc_data(path, bs, shuffle, device='cpu'):
             all_out = ut.fix_dim_size(all_out, max_all_pairs, dim=seq_dim)
 
             return {
+                'idx': torch.LongTensor([idx]).to(device),
                 'name': name,
                 # train
                 'train_in': train_in,
