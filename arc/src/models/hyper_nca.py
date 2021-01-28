@@ -35,12 +35,12 @@ class HyperNCA(ut.Module):
         )
         # TODO: Try with 5x5 conv
         self.hyper_conv_1 = ut.HyperConvFilter2D(
-            bank_params=512,
+            bank_params=1024,
             address_size=self.address_size,
-            conv_volume=(self.all_in_channels, 3, 3),
+            conv_volume=(self.all_in_channels, 5, 5),
         )
         self.hyper_conv_2 = ut.HyperConvFilter2D(
-            bank_params=1024,
+            bank_params=2048,
             address_size=self.address_size,
             conv_volume=(self.middle_channels, 1, 1),
         )
@@ -57,7 +57,7 @@ class HyperNCA(ut.Module):
         addresses_2 = self.addresser_2(task_features)
 
         conv_1 = self.hyper_conv_1( \
-            w_addr=addresses_1, b_addr=addresses_1, s=1, p=1, seq_size=seq_size)
+            w_addr=addresses_1, b_addr=addresses_1, s=1, p=2, seq_size=seq_size)
         conv_2 = self.hyper_conv_2( \
             w_addr=addresses_2, b_addr=addresses_2, s=1, p=0, seq_size=seq_size)
 
