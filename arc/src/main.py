@@ -50,7 +50,7 @@ def log(model, dataloader, prefix, hparams):
     infos = epoch_info['infos']
     loss_mean = epoch_info['loss_mean']
     loss_sort_index = epoch_info['loss_sort_index']
-    names = infos['name']
+    names = infos['name'][loss_sort_index.tolist()]
 
     idx = 0
     logger.log_info(
