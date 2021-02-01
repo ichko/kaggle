@@ -78,24 +78,35 @@ class ConvProgrammableNCA(ut.Module):
 
     def criterion(self, y_pred, y):
         loss = 0
-        seq_dims = list(range(y_pred.size(2)))
-        weights_sum = 0
+        bs, test_len, num_iters = y_pred.shape[:3]
 
+        unrolled_y_pred = y_pred.view(-1, *y_pred.shape[-3:])
+        unrolled_y = ut.unsqueeze_expand(y, dim=2, times=num_iters)
+        unrolled_y = unrolled_y.reshape(-1, *unrolled_y.shape[-2:])
+        all_losses = F.nll_loss(
+            input=unrolled_y_pred,
+            target=unrolled_y,
+            reduction='none',
+        ).mean(dim=(1, 2))
+
+        weights = []
+        seq_dims = list(range(num_iters))
+        weights_sum = 0
         for i in seq_dims:
             weight = (i + 1) / len(seq_dims)
             weight = (weight + 1) / 2
             weights_sum += weight
+            weights.append(weight)
 
-            batch_losses = F.nll_loss(
-                input=y_pred[:, :, i].reshape(-1, *y_pred.shape[-3:]),
-                target=y.reshape(-1, *y.shape[-2:]),
-                reduction='none',
-            ).mean(dim=(1, 2))
+        weights = torch.Tensor(weights).to(y.device)
+        weights = ut.unsqueeze_expand(weights, dim=0, times=bs)
+        weights = ut.unsqueeze_expand(weights, dim=1, times=test_len)
 
-            loss += batch_losses.mean() * weight
+        all_losses = all_losses.view(bs, test_len, num_iters)
+        batch_losses = all_losses[:, :, -1].mean(dim=1)
 
-        loss /= weights_sum
-        # loss /= len(seq_dims)
+        weighted_losses = (all_losses * weights) / weights_sum
+        loss = weighted_losses.mean()
 
         return loss, batch_losses  # The last batch losses
 

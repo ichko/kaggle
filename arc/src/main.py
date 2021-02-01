@@ -62,7 +62,6 @@ def log(model, dataloader, prefix, hparams):
 
     for desc in \
         ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
-        # TODO: Problem with batched loss sort index
         infos[desc] = infos[desc][loss_sort_index]
 
     for desc, idx in zip(['best', 'middle', 'worst'],
