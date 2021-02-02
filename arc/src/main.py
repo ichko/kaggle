@@ -82,8 +82,8 @@ def log(model, dataloader, prefix, hparams):
 
     print('\n', flush=True)
     print(f'======= LOG {prefix.upper()} =======', flush=True)
-    print(f'{prefix.upper()} LOSS  :', loss_mean, flush=True)
-    print(f'{prefix.upper()} SOLVED:', solved, flush=True)
+    print(f'{prefix.upper()} LOSS  : {loss_mean:.6f}', flush=True)
+    print(f'{prefix.upper()} SOLVED: {solved}', flush=True)
     print('\n', flush=True)
 
     model.train()

@@ -114,7 +114,7 @@ class Module(nn.Module):
 
         return {
             'infos': merge_dicts(infos),
-            'loss_mean': loss_mean,
+            'loss_mean': loss_mean.item(),
             'loss_sort_index': loss_sort_index,
             'all_losses': all_losses,
         }

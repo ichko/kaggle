@@ -21,9 +21,6 @@ def sanity_check():
     pass
 
 
-# TODO: Embed tasks with embedding layer
-
-
 class ConvProgrammableNCA(ut.Module):
     def set_num_iters(self, num_iters):
         self.num_iters = num_iters
