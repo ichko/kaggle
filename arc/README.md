@@ -89,3 +89,45 @@ _Example of canonical grid_
 ## Notes
 
 - NCA infer in latent space - explain in details
+
+**Things to try**
+
+- [ ] Give the network the ability to use global context
+
+  - The network must be able to see important information from the
+    input grid at all times (maybe encoded in all the latent channels)
+  - [ ] Use the demonstration pairs to infer a network that using the
+        test input infers the solver network
+
+- [ ] Iterative building of parameter banks
+
+  - Use a bank of 2D params to build a 3D bank
+  - Use the bank of 3D params to build the hyper conv layers
+
+- Data augmentation
+
+  - [ ] Color permutations
+  - [ ] Symmetries
+
+- "Programmer" network ideas (the network that infers the parameters of the "solver" network)
+
+  - [x] Linear programmer
+  - Embed the task
+    - [x] Single vector representation (used to infer addresses)
+    - [ ] Embed the whole network (the addresses)
+  - [ ] RNN Programmer
+  - [ ] Tree recursion programmer
+    - Network that takes a list of fixed length 1D tensors and duplicates then
+    - Use it to rapidly build many addresses
+  - [ ] Transformer
+  - [ ]
+
+- "Solved" network ideas
+  - [x] Currently experimenting with NCA
+  - [x] Some of the channels in the "core" of the CNN-RNN are latent
+    - Mind the way the activation at the end is done
+  - [x] Embedded NCA - embed the actual grids (transform only the channels in order not to lose spatial information)
+    - Did not get good results
+    - [ ] Revisit
+  - [ ] CNN Directly solving the pattern
+  - [ ] Transformer

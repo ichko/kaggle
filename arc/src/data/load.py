@@ -74,9 +74,9 @@ def load_folder(path):
     file_names = os.listdir(path)
     # file_names = file_names[:8]
 
-    if config.IS_DEBUG:
-        # limit files in debug mode
-        file_names = file_names[:32]
+    # if config.IS_DEBUG:
+    #     # limit files in debug mode
+    #     file_names = file_names[:32]
 
     for file_name in file_names:
         file_path = os.path.join(path, file_name)

@@ -17,7 +17,7 @@ class HyperNCA(ut.Module):
         self.address_size = 16
         self.in_channels = in_channels
 
-        self.middle_channels = 128
+        self.middle_channels = 64
         self.all_in_channels = 20
         self.latent_channels = self.all_in_channels - in_channels
 
