@@ -1,6 +1,5 @@
 import sys
 from argparse import Namespace
-from collections import OrderedDict
 
 IS_DEBUG = '--debug' in sys.argv
 
