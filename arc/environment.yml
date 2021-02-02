@@ -1,0 +1,8 @@
+name: arc
+dependencies:
+  - torch
+  - torchvision
+  - numpy
+  - wandb
+  - matplotlib
+  - tqdm
