@@ -2,6 +2,14 @@
 
 This repository contains experiments and ideas around the [fchollet](https://twitter.com/fchollet)'s [ARC Challenge](https://www.kaggle.com/c/abstraction-and-reasoning-challenge/).
 
+Run training with
+
+```sh
+wandb local # Or log in wandb
+
+python -m src.main --config conv_programmable_nca --from-scratch
+```
+
 ## About the challenge
 
 The dataset of this challenge contains a bunch of `tasks`.
