@@ -10,8 +10,7 @@ import src.logger as logger
 import src.config as config
 import src.utils as utils
 import src.metrics as metrics
-import src.data.preprocess as preprocess
-import src.data.postprocess as postprocess
+import src.nn_utils as ut
 
 import matplotlib.pyplot as plt
 import torch
@@ -32,90 +31,33 @@ def get_model(hparams):
     model = model_module.make_model(vars(hparams))
     model.make_persisted(f'.models/{model.name}_{RUN_ID}.weights')
 
-    return model
-
-
-def log(model, dataloader, prefix, hparams):
-    model.eval()
-
-    score, solved = metrics.arc_eval(model, dataloader, hparams.nca_iterations)
-    with torch.no_grad():
-        epoch_info = model.optim_epoch(
-            dataloader,
-            preprocess=preprocess.strict_predict_all_tiles,
-            postprocess=postprocess.standard,
-            verbose=True,
-        )
-
-    infos = epoch_info['infos']
-    loss_mean = epoch_info['loss_mean']
-    loss_sort_index = epoch_info['loss_sort_index']
-    names = infos['name'][loss_sort_index.tolist()]
-
-    idx = 0
-    logger.log_info(
-        caption=infos['name'][idx],
-        info=infos,
-        prefix=prefix,
-        idx=idx,
-    )
-
-    for desc in \
-        ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
-        infos[desc] = infos[desc][loss_sort_index]
-
-    for desc, idx in zip(['best', 'middle', 'worst'],
-                         [0, len(infos['test_len']) // 2, -1]):
-        name = names[idx]
-        logger.log_info(
-            caption=name,
-            info=infos,
-            prefix=prefix + '_' + desc,
-            idx=idx,
-        )
-
-    logger.log({
-        f'{prefix}_loss_mean': loss_mean,
-        f'{prefix}_score': score,
-        f'{prefix}_solved': solved,
-    })
-
-    print('\n', flush=True)
-    print(f'======= LOG {prefix.upper()} =======', flush=True)
-    print(f'{prefix.upper()} LOSS  : {loss_mean:.6f}', flush=True)
-    print(f'{prefix.upper()} SOLVED: {solved}', flush=True)
-    print('\n', flush=True)
-
-    model.train()
+    return model.to(DEVICE)
 
 
 def main(hparams):
     pp = pprint.PrettyPrinter(4)
     pp.pprint(vars(hparams))
 
-    train_dl = data.load_arc_data(
-        path='.data/training',
-        bs=hparams.bs,
-        shuffle=True,
-        device=DEVICE,
-    )
-
-    val_dl = data.load_arc_data(
-        path='.data/evaluation',
-        bs=hparams.bs,
-        shuffle=True,
-        device=DEVICE,
-    )
-
-    test_dl = data.load_arc_data(
-        path='.data/test',
-        bs=hparams.bs,
-        shuffle=True,
-        device=DEVICE,
-    )
-
+    dataloaders = data.load(hparams=hparams, DEVICE=DEVICE)
     model = get_model(hparams)
-    model = model.to(DEVICE)
+
+    trainer = ut.make_trainer(
+        model=model,
+        dl=dataloaders['train'],
+        preprocess=lambda batch: data.preprocess.stochastic_train(
+            batch,
+            num_train_samples=hparams.num_train_samples,
+            num_test_samples=hparams.num_test_samples,
+        ),
+        postprocess=data.postprocess.standard,
+    )
+
+    log_trainer = ut.make_trainer(
+        model=model,
+        dl=dataloaders['train'],
+        preprocess=data.preprocess.strict_predict_all_tiles,
+        postprocess=data.postprocess.standard,
+    )
 
     if '--from-scratch' not in sys.argv:
         try:
@@ -150,22 +92,62 @@ def main(hparams):
         # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
         # model.set_num_iters(num_iters)
 
-        tq_batches = tqdm(train_dl)
-        for idx, batch in enumerate(tq_batches):
-            batch = preprocess.stochastic_train(
-                batch,
-                num_train_samples=hparams.num_train_samples,
-                num_test_samples=hparams.num_test_samples,
-            )
-            info = model.optim_step(batch)
-            loss = info['loss']
+        tq_batches = tqdm(trainer)
+        for idx, info in enumerate(tq_batches):
+            loss = info['loss'].item()
 
             tq_batches.set_description(f'Loss: {loss:.6f}')
             logger.log({'train_loss': loss})
 
         if epoch % hparams.eval_interval == 0:
-            log(model, train_dl, prefix='train', hparams=hparams)
-            # log(model, val_dl, prefix='val', hparams=hparams)
+            model.eval()
+
+            with torch.no_grad():
+                score, solved = metrics.arc_eval(log_trainer)
+                info = log_trainer.epoch(verbose=True)
+
+            infos = info['infos']
+            loss_mean = info['loss_mean']
+            loss_sort_index = info['loss_sort_index']
+            names = infos['name'][loss_sort_index.tolist()]
+
+            prefix = 'train'
+            idx = 0
+
+            logger.log_info(
+                caption=infos['name'][idx],
+                info=infos,
+                prefix=prefix,
+                idx=idx,
+            )
+
+            for desc in \
+                ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
+                infos[desc] = infos[desc][loss_sort_index]
+
+            for desc, idx in zip(['best', 'middle', 'worst'],
+                                 [0, len(infos['test_len']) // 2, -1]):
+                name = names[idx]
+                logger.log_info(
+                    caption=name,
+                    info=infos,
+                    prefix=prefix + '_' + desc,
+                    idx=idx,
+                )
+
+            logger.log({
+                f'{prefix}_loss_mean': loss_mean,
+                f'{prefix}_score': score,
+                f'{prefix}_solved': solved,
+            })
+
+            print('\n', flush=True)
+            print(f'======= LOG {prefix.upper()} =======', flush=True)
+            print(f'{prefix.upper()} LOSS  : {loss_mean:.6f}', flush=True)
+            print(f'{prefix.upper()} SOLVED: {solved}', flush=True)
+            print('\n', flush=True)
+
+            model.train()
 
             model.persist()
 
