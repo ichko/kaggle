@@ -25,6 +25,8 @@ _Example Grids_
 
 The idea of my "end-to-end solution" is as follows:
 
+- "Programmer - Solver" meta learning model.
+
 - Encode the demonstration pairs with Multilayer CNN - each pair is encoded into
   a feature vector of fixed size (say 64 dimensions). Average the features
   of the demonstrations of the task.
@@ -32,27 +34,35 @@ The idea of my "end-to-end solution" is as follows:
 - Use this vector to infer the parameters of a convolutional cellular-automata that
   is then trained to transform the input pair into the output one.
 
-- We can of the encoding vector as representing an algorithm used to solve the pair.
+- We can think of the encoding vector as representing an algorithm used to solve the pair.
   Then we use a hyper-network (network used to infer the parameters of another network) to "compile" this vector into an "executable" cellular automaton.
   This inferred cellular automaton is then used to transform the input into the output.
 
 - We can think of the whole process as a meta-learning procedure. We train a network
-  that given examples of the task can infer a network that can solve the task.
+  that given a demonstrations of the task can infer a network that can solve the task.
 
 - The whole network can be trained end-to-end to solve the tasks using gradient
   based optimization (SGD).
 
+---
+
+- The feature extracting CNN and the hyper-network form the programmer. A network
+  that programs another network.
+
+- The solver is the CA. The parameters of the CA are runtime activations.
+
 ## In detail
 
-"Address parameters" in differentiable way to use them in
-some differentiable computation.
+"How do you infer a vector long enough to contain the parameters of the solver?"
 
-The ideas here are based on some ideas I had during the making of my masters
-thesis project on learning to simulate games with neural networks.
-The main idea is to have a _soft addressable computation_. This means
-that some learnable parameters of the network are used to be blended
-together (addressed) and the resulting tensor is used as
-a parameter for computation of the network - similar to what hyper nets do.
+"Learn a banks of parameters and address them in differentiable way" (_soft addressable computation_)
+
+The idea is somewhat inspired by learning assets to simulate games from my masters theses.
+In the context of learning parameters of networks we will have the following setup.
+We will initialize a bank of tensors, and the use the features of the programmer
+network to blend the parameters in the bank and infer the runtime parameters.
+This setup utilizes representations to come up with small useful set of
+"utility" tensors, that are then combined runtime to produce the final solver.
 
 - Pick ConvKernels - softmax the feature vector and blend multiple trainable
   kernel banks to infer a single bank used inside the `nca` to solve the task.
@@ -69,13 +79,7 @@ a parameter for computation of the network - similar to what hyper nets do.
 
 _\*input-conv-bank - tensor with dims [input_channels, kernel_size, kernel_size]_
 
-- Attention addressing SoftConvKernel - The addressing in the previous
-  bullet used softmax over the feature vector to compute the blending parameters
-  for the kernels. This leads to the feature vector being too big (if we want to
-  have lots of utility input conv banks).
-  Use small vectors to "address" the different conv input banks and
-  use attention to blend them. The feature vector has to be used to compute
-  multiple keys for the different output channels. (multi-head addressing).
+- Attention addressing SoftConvKernel - The addressing in the previous bullet used softmax over the feature vector to compute the blending parameters for the kernels. This leads to the feature vector being too big (if we want to have lots of utility input conv banks). Use small vectors as "addresses" of the parameters in the bank. Use attention to blend them. The feature vector has to be used to compute multiple keys for the different output channels. (multi-head addressing).
 
 TODO: Add diagrams
 
