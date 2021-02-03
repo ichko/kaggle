@@ -13,4 +13,7 @@ def standard(batch, info):
         'test_pred': info['test_pred'],
         'test_pred_seq': info['test_pred_seq'],
         'batch_losses': info['batch_losses'],
+        # STD Interface
+        'y': y,
+        'y_pred': info['test_pred'],
     }
