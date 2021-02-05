@@ -59,6 +59,13 @@ def main(hparams):
         postprocess=data.postprocess.standard,
     )
 
+    evaluation_iter = ut.make_trainer(
+        model=model,
+        dl=dataloaders['train'],
+        preprocess=data.preprocess.strict,
+        postprocess=data.postprocess.standard,
+    )
+
     if '--from-scratch' not in sys.argv:
         try:
             model.preload_weights()
@@ -103,7 +110,7 @@ def main(hparams):
             model.eval()
 
             with torch.no_grad():
-                score, solved = metrics.arc_eval(log_trainer)
+                score, solved = metrics.arc_eval(evaluation_iter)
                 info = log_trainer.epoch(verbose=True)
 
             infos = info['infos']
