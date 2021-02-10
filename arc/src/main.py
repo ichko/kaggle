@@ -101,7 +101,12 @@ def main(hparams):
                     postprocess=data.postprocess.standard,
                 )
                 for info in tqdm(log_cycle):
-                    eval_metric.push(info)
+                    # Take only the last demonstration pair as it is the actual test pair
+                    # TODO: The design of this should be considered
+                    y_hat_batch = info['y_pred'][:, -1]
+                    y_batch = info['y'][:, -1]
+
+                    eval_metric.push(y_hat_batch, y_batch)
 
             score, solved = eval_metric.reduce()
             info = log_cycle.artefacts()
@@ -113,7 +118,6 @@ def main(hparams):
 
             prefix = 'train'
             idx = 0
-
             logger.log_info(
                 caption=infos['name'][idx],
                 info=infos,
@@ -125,8 +129,10 @@ def main(hparams):
                 ['test_len', 'test_in', 'test_out', 'test_pred_seq', 'test_pred']:
                 infos[desc] = infos[desc][loss_sort_index]
 
-            for desc, idx in zip(['best', 'middle', 'worst'],
-                                 [0, len(infos['test_len']) // 2, -1]):
+            best_middle_worst = zip(['best', 'middle', 'worst'],
+                                    [0, len(infos['test_len']) // 2, -1])
+            best_worst = zip(['best', 'worst'], [0, -1])
+            for desc, idx in best_worst:
                 name = names[idx]
                 logger.log_info(
                     caption=name,
