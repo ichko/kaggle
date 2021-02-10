@@ -93,61 +93,50 @@ class Module(nn.Module):
         }
 
 
-def make_trainer(
+def make_cycle(
     model,
     dl,
     preprocess=lambda x: x,
     postprocess=lambda x: x,
 ):
-    class Iterator:
-        def __init__(self):
-            self.loss_mean = []
-            self.all_losses = []
-            self.infos = []
-            self.it = iter(dl)
 
-        def __next__(self):
-            batch = next(self.it)
-            batch = preprocess(batch)
-            info = model.optim_step(batch)
-            info = postprocess(batch, info)
+    loss_mean = []
+    all_losses = []
+    infos = []
+    it = iter(dl)
 
-            self.loss_mean.append(info['loss'].item())
-            self.infos.append(info)
-            if 'batch_losses' in info:
-                self.all_losses.append(info['batch_losses'])
-
-            return info
-
-    class Iterable:
+    class Cycle:
         def __len__(self):
             return len(dl)
 
         def __iter__(self):
-            return Iterator()
+            return self
 
-        def epoch(self, verbose=True):
-            it = iter(self)
-            progress_bar = tqdm(total=len(self), disable=not verbose)
-            while True:
-                try:
-                    next(it)
-                    progress_bar.update(1)
-                except StopIteration:
-                    break
+        def __next__(self):
+            batch = next(it)
+            batch = preprocess(batch)
+            info = model.optim_step(batch)
+            info = postprocess(batch, info)
 
-            loss_mean = torch.Tensor(it.loss_mean).mean()
-            all_losses = torch.cat(it.all_losses)
-            loss_sort_index = all_losses.argsort()
+            loss_mean.append(info['loss'].item())
+            infos.append(info)
+            if 'batch_losses' in info:
+                all_losses.append(info['batch_losses'])
+
+            return info
+
+        def artefacts(self):
+            _all_losses = torch.cat(all_losses)
+            loss_sort_index = _all_losses.argsort()
 
             return {
-                'infos': merge_dicts(it.infos),
-                'loss_mean': loss_mean.item(),
+                'infos': merge_dicts(infos),
+                'loss_mean': torch.Tensor(loss_mean).mean().item(),
                 'loss_sort_index': loss_sort_index,
-                'all_losses': all_losses,
+                'all_losses': _all_losses,
             }
 
-    return Iterable()
+    return Cycle()
 
 
 def merge_dicts(dicts):
