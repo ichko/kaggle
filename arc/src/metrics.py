@@ -17,10 +17,10 @@ class ArcEval:
         # Currently outputting single prediction per test input
         assert y_hat_batch.shape == y_batch.shape
 
+        self.length += len(y_batch)
         for y, y_hat in zip(y_batch, y_hat_batch):
             equal = torch.all(y_hat.int() == y.int()).item()
             self.error += not equal
-            self.length += len(y_batch)
             self.num_solved += equal
 
     def reduce(self):
