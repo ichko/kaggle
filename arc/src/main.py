@@ -101,10 +101,14 @@ def main(hparams):
                     postprocess=data.postprocess.standard,
                 )
                 for info in tqdm(log_cycle):
-                    # Take only the last demonstration pair as it is the actual test pair
                     # TODO: The design of this should be considered
-                    y_hat_batch = info['y_pred'][:, -1]
-                    y_batch = info['y'][:, -1]
+                    # Take only the last demonstration pair as it is the actual test pair
+                    # The test sequences are padded so the selection of the last
+                    #   test input/output pair must be done using the lengths
+                    #   of the sequences as index.
+
+                    y_hat_batch = info['y_pred'][:, info['test_len'] - 1]
+                    y_batch = info['y'][:, info['test_len'] - 1]
 
                     eval_metric.push(y_hat_batch, y_batch)
 
