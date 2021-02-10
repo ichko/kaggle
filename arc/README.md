@@ -100,6 +100,8 @@ _Example of canonical grid_
 
 ## Notes
 
+- TODO: Save demo gifs in separate thread
+
 - NCA infer in latent space - explain in details
 
 **Things to try**
