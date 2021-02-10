@@ -41,31 +41,6 @@ def main(hparams):
     dataloaders = data.load(hparams=hparams, DEVICE=DEVICE)
     model = get_model(hparams)
 
-    trainer = ut.make_trainer(
-        model=model,
-        dl=dataloaders['train'],
-        preprocess=lambda batch: data.preprocess.stochastic_train(
-            batch,
-            num_train_samples=hparams.num_train_samples,
-            num_test_samples=hparams.num_test_samples,
-        ),
-        postprocess=data.postprocess.standard,
-    )
-
-    log_trainer = ut.make_trainer(
-        model=model,
-        dl=dataloaders['train'],
-        preprocess=data.preprocess.strict_predict_all_tiles,
-        postprocess=data.postprocess.standard,
-    )
-
-    evaluation_iter = ut.make_trainer(
-        model=model,
-        dl=dataloaders['train'],
-        preprocess=data.preprocess.strict,
-        postprocess=data.postprocess.standard,
-    )
-
     if '--from-scratch' not in sys.argv:
         try:
             model.preload_weights()
@@ -96,10 +71,18 @@ def main(hparams):
     model.summary()
 
     for epoch in tqdm(range(hparams.epochs)):
-        # for num_iters in tqdm(range(1, hparams.nca_iterations, 10)):
-        # model.set_num_iters(num_iters)
+        training_cycle = ut.make_cycle(
+            model=model,
+            dl=dataloaders['train'],
+            preprocess=lambda batch: data.preprocess.stochastic_train(
+                batch,
+                num_train_samples=hparams.num_train_samples,
+                num_test_samples=hparams.num_test_samples,
+            ),
+            postprocess=data.postprocess.standard,
+        )
+        tq_batches = tqdm(training_cycle)
 
-        tq_batches = tqdm(trainer)
         for idx, info in enumerate(tq_batches):
             loss = info['loss'].item()
 
@@ -110,8 +93,18 @@ def main(hparams):
             model.eval()
 
             with torch.no_grad():
-                score, solved = metrics.arc_eval(evaluation_iter)
-                info = log_trainer.epoch(verbose=True)
+                eval_metric = metrics.ArcEval()
+                log_cycle = ut.make_cycle(
+                    model=model,
+                    dl=dataloaders['train'],
+                    preprocess=data.preprocess.strict_predict_all_tiles,
+                    postprocess=data.postprocess.standard,
+                )
+                for info in tqdm(log_cycle):
+                    eval_metric.push(info)
+
+            score, solved = eval_metric.reduce()
+            info = log_cycle.artefacts()
 
             infos = info['infos']
             loss_mean = info['loss_mean']
