@@ -102,7 +102,7 @@ class ConvProgrammableNCA(ut.Module):
         all_losses = all_losses.view(bs, test_len, num_iters)
         batch_losses = all_losses[:, :, -1].mean(dim=1)
 
-        weighted_losses = (all_losses * weights) / weights_sum
+        weighted_losses = torch.sum(all_losses * weights, dim=2) / weights_sum
         loss = weighted_losses.mean()
 
         return loss, batch_losses  # The last batch losses
