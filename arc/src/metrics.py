@@ -13,10 +13,8 @@ class ArcEval:
         self.length = 0
         self.num_solved = 0
 
-    def push(self, info):
+    def push(self, y_hat_batch, y_batch):
         # Currently outputting single prediction per test input
-        y_hat_batch = info['y_pred']
-        y_batch = info['y']
         assert y_hat_batch.shape == y_batch.shape
 
         for y, y_hat in zip(y_batch, y_hat_batch):
