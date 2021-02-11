@@ -25,7 +25,7 @@ class HyperNCA(ut.Module):
         # +1 for dimensions picking the biases
         self.addresser_1 = ut.LinearAddresser(
             feature_size,
-            out_shape=(self.middle_channels, ),
+            out_shape=(self.middle_channels, self.all_in_channels + 1),
             address_size=self.address_size,
         )
         self.addresser_2 = ut.LinearAddresser(
@@ -37,7 +37,7 @@ class HyperNCA(ut.Module):
         self.hyper_conv_1 = ut.HyperConvFilter2D(
             bank_params=512,
             address_size=self.address_size,
-            conv_volume=(self.all_in_channels, 3, 3),
+            conv_volume=(3, 3),
         )
         self.hyper_conv_2 = ut.HyperConvFilter2D(
             bank_params=64,
@@ -72,10 +72,12 @@ class HyperNCA(ut.Module):
         task_features = torch.mean(task_features, dim=1)
 
         addresses_1 = self.addresser_1(task_features)
+        addresses_1_b = addresses_1[:, :, 0]
+        addresses_1_w = addresses_1[:, :, 1:]
         addresses_2 = self.addresser_2(task_features)
 
         conv_1 = self.hyper_conv_1( \
-            w_addr=addresses_1, b_addr=addresses_1, s=1, p=1, seq_size=seq_size)
+            w_addr=addresses_1_w, b_addr=addresses_1_b, s=1, p=1, seq_size=seq_size)
         conv_2 = self.hyper_conv_2( \
             w_addr=addresses_2, b_addr=addresses_2, s=1, p=0, seq_size=seq_size)
 
