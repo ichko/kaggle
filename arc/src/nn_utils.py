@@ -68,6 +68,14 @@ class Module(nn.Module):
     def device(self):
         return next(self.parameters()).device
 
+    def freeze(self):
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def unfreeze(self):
+        for param in self.parameters():
+            param.requires_grad = True
+
     def optim_step(self, batch):
         X, y = batch
 
@@ -196,7 +204,7 @@ class InferredConv2D(nn.Module):
         return batch_conv(x, self.w, self.b, p=p, s=s)
 
 
-class HyperConvFilter2D(nn.Module):
+class HyperConvFilter2D(Module):
     def __init__(self, bank_params, address_size, conv_volume):
         """
         Types:
@@ -244,7 +252,7 @@ class HyperConvFilter2D(nn.Module):
         return InferredConv2D(w, b, s, p)
 
 
-class LinearAddresser(nn.Module):
+class LinearAddresser(Module):
     def __init__(self, in_features_size, out_shape, address_size):
         super().__init__()
         self.num_addresses = np.prod(out_shape)
