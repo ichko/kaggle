@@ -75,9 +75,12 @@ class ConvProgrammableNCA(ut.Module):
 
     def criterion(self, y_pred, y):
         loss = 0
+
+        # Discard first sequence entry since its the input
+        y_pred = y_pred[:, :, 1:]
         bs, test_len, num_iters = y_pred.shape[:3]
 
-        unrolled_y_pred = y_pred.view(-1, *y_pred.shape[-3:])
+        unrolled_y_pred = y_pred.reshape(-1, *y_pred.shape[-3:])
         unrolled_y = ut.unsqueeze_expand(y, dim=2, times=num_iters)
         unrolled_y = unrolled_y.reshape(-1, *unrolled_y.shape[-2:])
         all_losses = F.nll_loss(
@@ -90,8 +93,9 @@ class ConvProgrammableNCA(ut.Module):
         seq_dims = list(range(num_iters))
         weights_sum = 0
         for i in seq_dims:
-            weight = (i + 1) / len(seq_dims)
-            weight = (weight + 1) / 2
+            # weight = (i + 1) / len(seq_dims)
+            # weight = (weight + 1) / 2
+            weight = 1
             weights_sum += weight
             weights.append(weight)
 
