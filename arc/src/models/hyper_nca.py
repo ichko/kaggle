@@ -17,8 +17,8 @@ class HyperNCA(ut.Module):
         self.address_size = 16
         self.in_channels = in_channels
 
-        self.middle_channels = 64
-        self.all_in_channels = 20
+        self.middle_channels = 128
+        self.all_in_channels = 32
         self.latent_channels = self.all_in_channels - in_channels
 
         # TODO: Write transformer indexing soft kernels Conv2D
@@ -35,19 +35,37 @@ class HyperNCA(ut.Module):
         )
         # TODO: Try with 5x5 conv
         self.hyper_conv_1 = ut.HyperConvFilter2D(
-            bank_params=1024,
+            bank_params=512,
             address_size=self.address_size,
             conv_volume=(self.all_in_channels, 3, 3),
         )
         self.hyper_conv_2 = ut.HyperConvFilter2D(
-            bank_params=128,
+            bank_params=64,
             address_size=self.address_size,
             conv_volume=(self.middle_channels, 1, 1),
         )
 
         self.bn_1 = nn.BatchNorm2d(self.middle_channels)
 
+        self.counter = 0
+        self.toggle = False
+
     def forward(self, task_features, infer_inputs, num_iters):
+        if self.training and self.counter % 100 == 0:
+            self.toggle = not self.toggle
+            if self.toggle:
+                self.addresser_1.freeze()
+                self.addresser_2.freeze()
+                self.hyper_conv_1.unfreeze()
+                self.hyper_conv_2.unfreeze()
+            else:
+                self.addresser_1.unfreeze()
+                self.addresser_2.unfreeze()
+                self.hyper_conv_1.freeze()
+                self.hyper_conv_2.freeze()
+
+        self.counter += self.training
+
         # TODO: This should be changed to something more expressive.
         # Now we just avg across demonstrations.
         seq_size = infer_inputs.size(1)
@@ -63,8 +81,10 @@ class HyperNCA(ut.Module):
 
         def solve_task(x):
             seq_shape = list(x.shape)
-            seq_shape.insert(1, num_iters)
+            seq_shape.insert(1, num_iters + 1)
             seq = torch.zeros(seq_shape).to(x.device)
+
+            seq[:, 0] = x
 
             for i in range(num_iters):
                 x = conv_1(x)
@@ -80,7 +100,7 @@ class HyperNCA(ut.Module):
                     torch.tanh(x[:, self.in_channels:].clone())
 
                 # x = torch.softmax(x, dim=1)
-                seq[:, i] = x
+                seq[:, i + 1] = x
 
             seq = seq[:, :, :self.in_channels]
             return torch.log(seq)
