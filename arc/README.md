@@ -2,6 +2,8 @@
 
 This repository contains experiments and ideas around the [fchollet](https://twitter.com/fchollet)'s [ARC Challenge](https://www.kaggle.com/c/abstraction-and-reasoning-challenge/).
 
+Presentation of the model - [Google Slides](https://docs.google.com/presentation/d/1kr_g2416fnWQQePeG7R_mS0YjO5J-_y1KNVEGBNrvbg/edit?usp=sharing)
+
 Run training with
 
 ```sh
