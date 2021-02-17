@@ -114,6 +114,12 @@ _Example of canonical grids_
 
 **Things to try**
 
+- Look at how LSTMs are activated internally and emulate it in the NCA.
+
+- NCA with gates as transitions.
+
+- TODO: Label smoothing
+
 - [ ] Give the network the ability to use global context
 
   - The network must be able to see important information from the
