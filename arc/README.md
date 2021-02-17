@@ -103,6 +103,7 @@ _\*input-conv-bank - tensor with dims [input_channels, kernel_size, kernel_size]
   transformed into the output one.
 
 ![example of solved](./assets/example-solved-2.png)
+
 _Example of canonical grids_
 
 ## Notes
