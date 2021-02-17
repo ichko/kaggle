@@ -17,7 +17,7 @@ class HyperNCA(ut.Module):
         self.address_size = 16
         self.in_channels = in_channels
 
-        self.middle_channels = 128
+        self.middle_channels = 64
         self.all_in_channels = 32
         self.latent_channels = self.all_in_channels - in_channels
 
@@ -29,6 +29,11 @@ class HyperNCA(ut.Module):
             address_size=self.address_size,
         )
         self.addresser_2 = ut.LinearAddresser(
+            feature_size,
+            out_shape=(self.middle_channels, ),
+            address_size=self.address_size,
+        )
+        self.addresser_3 = ut.LinearAddresser(
             feature_size,
             out_shape=(self.all_in_channels, ),
             address_size=self.address_size,
@@ -46,6 +51,7 @@ class HyperNCA(ut.Module):
         )
 
         self.bn_1 = nn.BatchNorm2d(self.middle_channels)
+        self.bn_2 = nn.BatchNorm2d(self.middle_channels)
 
         self.counter = 0
         self.toggle = False
@@ -75,11 +81,14 @@ class HyperNCA(ut.Module):
         addresses_1_b = addresses_1[:, :, 0]
         addresses_1_w = addresses_1[:, :, 1:]
         addresses_2 = self.addresser_2(task_features)
+        addresses_3 = self.addresser_3(task_features)
 
         conv_1 = self.hyper_conv_1( \
             w_addr=addresses_1_w, b_addr=addresses_1_b, s=1, p=1, seq_size=seq_size)
         conv_2 = self.hyper_conv_2( \
             w_addr=addresses_2, b_addr=addresses_2, s=1, p=0, seq_size=seq_size)
+        conv_3 = self.hyper_conv_2( \
+            w_addr=addresses_3, b_addr=addresses_3, s=1, p=0, seq_size=seq_size)
 
         def solve_task(x):
             seq_shape = list(x.shape)
@@ -92,8 +101,11 @@ class HyperNCA(ut.Module):
                 x = conv_1(x)
                 # x = F.dropout(x, p=0.01, training=self.training)
                 x = self.bn_1(x)
-                x = F.leaky_relu(x, negative_slope=0.5)
+                x = F.leaky_relu(x, negative_slope=0.1)
                 x = conv_2(x)
+                x = self.bn_2(x)
+                x = F.leaky_relu(x, negative_slope=0.1)
+                x = conv_3(x)
 
                 # Softmax only the input channels
                 x[:, :self.in_channels] = \
