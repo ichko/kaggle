@@ -1,4 +1,4 @@
-# Hyper Neural Cellular Automata (HNCA)
+# Hyper Neural Cellular Automata (HNCA) on ARC
 
 This repository contains experiments and ideas around the [fchollet](https://twitter.com/fchollet)'s [ARC Challenge](https://www.kaggle.com/c/abstraction-and-reasoning-challenge/).
 
@@ -20,10 +20,13 @@ you what kind of algorithm transforms the input to the output. Then each task
 has a test input grid and the challenge is to predict the output grid given
 the demonstrations.
 
-TODO: Add example grids
+![example of solved](./assets/example-solved-1.png)
+
 _Example Grids_
 
 ## Main idea
+
+![the big picture](./assets/hyper-nca-arc-the-big-picture.svg)
 
 The idea of my "end-to-end solution" is as follows:
 
@@ -52,6 +55,8 @@ The idea of my "end-to-end solution" is as follows:
   that programs another network.
 
 - The solver is the CA. The parameters of the CA are runtime activations.
+
+![the big picture](./assets/hyper-nca-arc-detailed.svg)
 
 ## In detail
 
@@ -83,7 +88,7 @@ _\*input-conv-bank - tensor with dims [input_channels, kernel_size, kernel_size]
 
 - Attention addressing SoftConvKernel - The addressing in the previous bullet used softmax over the feature vector to compute the blending parameters for the kernels. This leads to the feature vector being too big (if we want to have lots of utility input conv banks). Use small vectors as "addresses" of the parameters in the bank. Use attention to blend them. The feature vector has to be used to compute multiple keys for the different output channels. (multi-head addressing).
 
-TODO: Add diagrams
+![the big picture](./assets/hyper-nca-arc-soft-addressable-computation.svg)
 
 ## Canonize grids
 
@@ -97,8 +102,8 @@ TODO: Add diagrams
   that the cellular automaton has to encode - the input border has to be
   transformed into the output one.
 
-TODO: Add examples of canonical grids.
-_Example of canonical grid_
+![example of solved](./assets/example-solved-2.png)
+_Example of canonical grids_
 
 ## Notes
 
