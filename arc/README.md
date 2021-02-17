@@ -84,7 +84,7 @@ This setup utilizes representations to come up with small useful set of
   More parameter sharing - leads to learning more general conv kernels.
   (since they have to be reused)
 
-_\*input-conv-bank - tensor with dims [input_channels, kernel_size, kernel_size]_
+_*input-conv-bank* - tensor with dims [input_channels, kernel_size, kernel_size]_
 
 - Attention addressing SoftConvKernel - The addressing in the previous bullet used softmax over the feature vector to compute the blending parameters for the kernels. This leads to the feature vector being too big (if we want to have lots of utility input conv banks). Use small vectors as "addresses" of the parameters in the bank. Use attention to blend them. The feature vector has to be used to compute multiple keys for the different output channels. (multi-head addressing).
 
