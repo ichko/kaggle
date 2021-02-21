@@ -47,10 +47,10 @@ def make_task_animation(inputs, outputs, preds_seq, title='', size=2):
                 ax.set_xticks([])
                 ax.set_yticks([])
                 ax.set_title(f'{col}[{r}]')
-                yield ax.imshow(normalize_board(img[r]), cmap=cmap)
+                yield ax.imshow(img[r], cmap=cmap)
 
     seq_dim = 1
-    seq_range = range(preds_seq.size(seq_dim))
+    seq_range = range(preds_seq.shape[seq_dim])
     imgs = [list(get_actors(preds_seq[:, i])) for i in seq_range]
 
     fig.suptitle(title, y=0.99, fontsize=14)
@@ -70,14 +70,10 @@ def save_task_vid(path, *args, **kwargs):
     plt.close()
 
 
-def normalize_board(board):
-    return board.detach().cpu().numpy()
-
-
 def plot_grid(grid):
     fig, ax = plt.subplots(1, 1)
 
-    ax.imshow(normalize_board(grid), cmap=cmap, norm=norm)
+    ax.imshow(grid, cmap=cmap, norm=norm)
     # ax[i].grid(True, which='both', color='lightgrey', linewidth=0.5)
 
     return fig

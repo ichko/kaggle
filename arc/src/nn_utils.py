@@ -157,7 +157,7 @@ def merge_dicts(dicts):
 
     for k, v in combined.items():
         try:
-            result[k] = torch.cat(v)
+            result[k] = to_np(torch.cat(v))
         except Exception:
             try:
                 result[k] = np.concatenate(v)

@@ -117,8 +117,8 @@ def main(hparams):
 
             infos = info['infos']
             loss_mean = info['loss_mean']
-            loss_sort_index = info['loss_sort_index']
-            names = infos['name'][loss_sort_index.tolist()]
+            loss_sort_index = info['loss_sort_index'].tolist()
+            names = infos['name'][loss_sort_index]
 
             prefix = 'train'
             idx = 0
@@ -151,17 +151,17 @@ def main(hparams):
                 f'{prefix}_solved': solved,
             })
 
-            print('\n', flush=True)
-            print(f'======= LOG {prefix.upper()} =======', flush=True)
-            print(f'{prefix.upper()} LOSS  : {loss_mean:.6f}', flush=True)
-            print(f'{prefix.upper()} SOLVED: {solved}', flush=True)
-            print('\n', flush=True)
+            print('\n')
+            print(f'======= LOG {prefix.upper()} =======')
+            print(f'{prefix.upper()} LOSS  : {loss_mean:.6f}')
+            print(f'{prefix.upper()} SOLVED: {solved}')
+            print('\n')
 
             model.train()
 
-            model.persist()
+            # model.persist()
 
-        model.save()
+        # model.save()
 
 
 if __name__ == '__main__':
