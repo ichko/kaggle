@@ -4,6 +4,8 @@ import time
 from functools import wraps
 
 
+# TODO: Its not cool that we spawn a thread on every call
+# it will be much better with ThreadPoolExecutor
 class ThreadWithReturnValue(Thread):
     @wraps(Thread)
     def __init__(self, *args, **kwargs):
@@ -30,7 +32,7 @@ def deferred(runner):
         thread.start()
 
         class Future:
-            def get(self):
+            def await_result(self):
                 return thread.join()
 
         return Future()
@@ -49,4 +51,4 @@ if __name__ == "__main__":
     print('before')
     z = main()
     print('after')
-    print(z.get())
+    print(z.await_result())
