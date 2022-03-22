@@ -170,13 +170,51 @@ if __name__ == '__main__':
     seqid = next(iter(user_train['sequences']))
 
     seq = user_train['sequences'][seqid]['keypoints']
-    embedding = pcaproject(seq, pca, scaler, nframesclose, ntgtsclose)
+    # embedding = pcaproject(seq, pca, scaler, nframesclose, ntgtsclose)
 
-    # plot different flies different colors
-    fig, ax = plt.subplots()
-    for tgt in range(ntgts):
-        ax.plot(embedding[:, embed_size*tgt],
-                embedding[:, embed_size*tgt+1], '.')
-    _ = ax.axis('equal')
-    _ = ax.set_xlabel('PC 1')
-    _ = ax.set_ylabel('PC 2')
+    # # plot different flies different colors
+    # fig, ax = plt.subplots()
+    # for tgt in range(ntgts):
+    #     ax.plot(embedding[:, embed_size*tgt],
+    #             embedding[:, embed_size*tgt+1], '.')
+    # _ = ax.axis('equal')
+    # _ = ax.set_xlabel('PC 1')
+    # _ = ax.set_ylabel('PC 2')
+
+    # load submission data
+    # del user_train # may cause RAM shortage otherwise
+    submission_clips = np.load(
+        'data/submission_data.npy', allow_pickle=True).item()
+
+    # # apply this embedding to a test sequence
+    # seqid = next(iter(submission_clips['sequences']))
+    # seq = submission_clips['sequences'][seqid]['keypoints']
+    # embedding = pcaproject(seq,pca,scaler,nframesclose,ntgtsclose)
+
+    # # plot different flies different colors
+    # fig,ax = plt.subplots()
+    # for tgt in range(ntgts):
+    # ax.plot(embedding[:,embed_size*tgt],embedding[:,embed_size*tgt+1],'.')
+    # _ = ax.axis('equal')
+    # _ = ax.set_xlabel('PC 1')
+    # _ = ax.set_ylabel('PC 2')
+
+    num_total_frames = nframes * len(submission_clips['sequences'])
+    embeddings_array = np.empty(
+        (num_total_frames, embed_size*ntgts), dtype=np.float32)
+
+    frame_number_map = {}
+    start = 0
+    with tqdm(total=len(submission_clips['sequences'])) as pbar:
+        for seqid, v in submission_clips['sequences'].items():
+            seq = v['keypoints']
+            embedding = pcaproject(seq, pca, scaler, nframesclose, ntgtsclose)
+            end = start + nframes
+            embeddings_array[start:end, :] = embedding
+            frame_number_map[seqid] = (start, end)
+            start = end
+            pbar.update()
+
+    assert end == num_total_frames
+    submission_dict = {"frame_number_map": frame_number_map,
+                       "embeddings": embeddings_array}
