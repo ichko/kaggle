@@ -15,6 +15,7 @@ torch = "^1.11.0"
 jupyter = "^1.0.0"
 transformers = "^4.17.0"
 datasets = "^2.0.0"
+pytorch-lightning = "^1.5.10"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
