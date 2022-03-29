@@ -4,14 +4,18 @@ import pytorch_lightning as pl
 
 
 class MaskedSequencesDataset(torch.utils.data.Dataset):
+    TRAIN = np.load('data/user_train.npy',
+                    allow_pickle=True).item()
+
+    TEST = np.load('data/submission_data.npy',
+                   allow_pickle=True).item()
+
     def __init__(self, is_train=True):
         super().__init__()
         if is_train:
-            data_json = np.load('data/user_train.npy',
-                                allow_pickle=True).item()
+            data_json = self.TRAIN
         else:
-            data_json = np.load('data/submission_data.npy',
-                                allow_pickle=True).item()
+            data_json = self.TEST
 
         self.data = [(n, s['keypoints'])
                      for n, s in data_json['sequences'].items()]
