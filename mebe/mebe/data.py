@@ -21,7 +21,7 @@ class MaskedSequencesDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         name, seq = self.data[idx]
-        return name, seq[:1000]
+        return name, seq
 
 
 class MaskedSequencesDataModule(pl.LightningDataModule):

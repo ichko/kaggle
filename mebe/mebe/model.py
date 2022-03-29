@@ -24,7 +24,7 @@ class TransformerDenoisingModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         names, sequence = batch
 
-        sequence = sequence[0]
+        sequence = sequence[0][:1000]
         sequence[torch.isnan(sequence)] = 0
         seq_len, num_flies, _, _ = sequence.shape
         sequence = sequence.reshape(seq_len, num_flies, -1)
@@ -44,10 +44,22 @@ class TransformerDenoisingModel(pl.LightningModule):
 
 
 if __name__ == "__main__":
+    # torch.cuda.empty_cache()
     model = TransformerDenoisingModel()
     dm = MaskedSequencesDataModule(bs=1)
 
-    trainer = pl.Trainer(gpus=1)
+    tb_logger = pl.loggers.TensorBoardLogger(".logs/")
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        # monitor="val_loss",
+        monitor="train_loss",
+        dirpath=".checkpoints/",
+        filename="model-{epoch:02d}-{val_loss:.2f}",
+        save_top_k=3,
+        mode="min",
+    )
+
+    trainer = pl.Trainer(gpus=1, logger=tb_logger,
+                         callbacks=[checkpoint_callback])
     trainer.fit(
         model=model,
         train_dataloader=dm.train_dataloader()
