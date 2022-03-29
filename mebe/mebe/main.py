@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # parameters for embedding and sampling
     ntgtsclose = 2  # select this fly and the next closest fly
     nframesclose = 2  # select this and the next frame
-    nsampleswant = 10000
+    nsampleswant = 1000
 
     # sizes of various things
     nseq = len(user_train['sequences'])
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     dimsperframe = ntgtsclose*nfeatures*ndim
     # how many features will we use for each frame and fly
     highdim = dimsperframe * nframesclose
-    embed_size = 256//ntgts  # number of dimensions per target and frame
+    embed_size = 256 // ntgts  # number of dimensions per target and frame
     seq.shape
 
     # randomly choose a subset of the data
