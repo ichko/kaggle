@@ -218,3 +218,5 @@ if __name__ == '__main__':
     assert end == num_total_frames
     submission_dict = {"frame_number_map": frame_number_map,
                        "embeddings": embeddings_array}
+
+    np.save("submission2.npy", submission_dict)

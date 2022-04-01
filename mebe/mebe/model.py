@@ -3,7 +3,21 @@ import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from mebe.data import MaskedSequencesDataModule
+
+def remove_nan_entities(x):
+    ox = x
+    bs, seq, entity, features, dim = x.shape
+    x = x.permute(0, 2, 1, 3, 4)
+    x = x.reshape(bs * entity, seq * features * dim)
+    is_real = torch.any(torch.isnan(x), dim=-1) == False
+    x = x[is_real]
+    new_entity = x.size(0) // bs
+    x = x.view(bs, new_entity, seq, features, dim)
+    x = x.permute(0, 2, 1, 3, 4)
+    x = x.reshape(bs, seq, new_entity, features, dim)
+    x = x.contiguous()
+
+    return x
 
 
 class TransformerDenoisingModel(pl.LightningModule):
@@ -18,13 +32,15 @@ class TransformerDenoisingModel(pl.LightningModule):
 
         self.encoder_entity = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=4), num_layers=2)
+
+        # TODO: Conv1D time encoder?
         self.encoder_time = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=4), num_layers=2)
 
         self.head = nn.Sequential(
-            nn.Linear(hidden_dim, 48),
-            # nn.LeakyReLU(negative_slope=0.02),
-            # nn.Linear(48, 48),
+            nn.Linear(hidden_dim, 64),
+            nn.LeakyReLU(negative_slope=0.02),
+            nn.Linear(64, 48),
         )
 
     def forward(self, x):
@@ -58,7 +74,7 @@ class TransformerDenoisingModel(pl.LightningModule):
         names, sequence = batch
 
         sequence = sequence[:, :1000]
-        sequence[torch.isnan(sequence)] = 0
+        sequence = remove_nan_entities(sequence)
 
         mask_prob = 0.1
         mask = torch.rand_like(sequence) > mask_prob
