@@ -3,6 +3,8 @@ import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
+TIME_STEP_SIZE = 256
+
 
 def remove_nan_entities(x):
     ox = x
@@ -31,11 +33,10 @@ class TransformerDenoisingModel(pl.LightningModule):
         )
 
         self.encoder_entity = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=4), num_layers=2)
+            nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=5), num_layers=2)
 
-        # TODO: Conv1D time encoder?
         self.encoder_time = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=4), num_layers=2)
+            nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=5), num_layers=2)
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, 64),
@@ -45,17 +46,30 @@ class TransformerDenoisingModel(pl.LightningModule):
 
     def forward(self, x):
         bs, seq, entity, features, dim = x.shape
+
         x = x.view(bs * seq * entity, features * dim)
         x = self.encoder_features(x)
+
         x = x.view(bs * seq, entity, -1)
         x = self.encoder_entity(x)
+
+        x = x.view(bs, seq, entity, -1)
+        x = x.permute(0, 2, 1, 3)
+        x = x.view(bs * entity, seq, -1)
+        x = self.encoder_time(x)
+        x = x.view(bs, entity, seq, -1)
+        x = x.permute(0, 2, 1, 3)
+        x = x.view(bs, seq, entity, -1)
+
         x = self.head(x)
         x = x.view(bs, seq, entity, features, dim)
+
         return x
 
     def embed(self, inp):
         inp[torch.isnan(inp)] = 0
-        batches = torch.chunk(inp, chunks=10, dim=1)
+        batches = torch.split(
+            inp, split_size_or_sections=TIME_STEP_SIZE, dim=1)
         outs = []
         for x in batches:
             bs, seq, entity, features, dim = x.shape
@@ -70,19 +84,40 @@ class TransformerDenoisingModel(pl.LightningModule):
         outs = torch.cat(outs, dim=1)
         return outs
 
+    def optim_step(self, batch):
+        names, seq = batch
+
+        # seq = remove_nan_entities(seq)
+        seq[torch.isnan(seq)] = 0
+
+        mask_prob = 0.2
+        mask = torch.rand_like(seq) > mask_prob
+        masked_seq = seq * mask
+
+        seq_batches = torch.split(
+            seq, split_size_or_sections=TIME_STEP_SIZE, dim=1)
+        masked_seq_batches = torch.split(
+            masked_seq, split_size_or_sections=TIME_STEP_SIZE, dim=1)
+
+        loss = 0
+        for seq_batch, masked_seq_batch in zip(seq_batches, masked_seq_batches):
+            out = self(masked_seq_batch)
+            loss += F.mse_loss(out, seq_batch)
+
+        loss /= len(seq_batches)
+
+        return loss
+
     def training_step(self, batch, batch_idx):
-        names, sequence = batch
+        names, seq = batch
+        loss = self.optim_step(batch)
+        self.log("train_loss", loss, batch_size=len(seq))
+        return loss
 
-        sequence = sequence[:, :1000]
-        sequence = remove_nan_entities(sequence)
-
-        mask_prob = 0.1
-        mask = torch.rand_like(sequence) > mask_prob
-        masked_batch = sequence * mask
-        out = self(masked_batch)
-        loss = F.mse_loss(out, sequence)
-
-        self.log("train_loss", loss)
+    def validation_step(self, batch, batch_idx):
+        names, seq = batch
+        loss = self.optim_step(batch)
+        self.log("val_loss", loss, batch_size=len(seq))
         return loss
 
     def configure_optimizers(self):
