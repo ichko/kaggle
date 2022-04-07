@@ -1,4 +1,4 @@
-from mebe.data import MaskedSequencesDataModule, MaskedSequencesDataset
+from mebe.data import SequencesDataModule, SequencesDataset
 from mebe.model import TransformerDenoisingModel
 import numpy as np
 from tqdm.auto import tqdm
@@ -51,7 +51,7 @@ def validate_submission(submission, submission_clips):
 
 
 if __name__ == "__main__":
-    checkpoint_path = './.checkpoints/model-epoch=10-val_loss=0.00.ckpt'
+    checkpoint_path = './.checkpoints/model-epoch=80-val_loss=0.14.ckpt'
     DEVICE = 'cuda'
 
     # model = TransformerDenoisingModel()
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     model = model.to(DEVICE)
     model = model.eval()
 
-    dm = MaskedSequencesDataModule(bs=1)
+    dm = SequencesDataModule(bs=1)
     test_dl = dm.test_dataloader()
 
     names, seqs = next(iter(test_dl))
@@ -90,7 +90,7 @@ if __name__ == "__main__":
                        "embeddings": embeddings_array}
 
     validate_submission(
-        submission_dict, MaskedSequencesDataset.TEST)
+        submission_dict, SequencesDataset.TEST)
 
     np.save("submission.ignore.npy", submission_dict)
 
