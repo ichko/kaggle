@@ -51,7 +51,7 @@ def validate_submission(submission, submission_clips):
 
 
 if __name__ == "__main__":
-    checkpoint_path = './.checkpoints/model-epoch=80-val_loss=0.14.ckpt'
+    checkpoint_path = './.checkpoints/model-epoch=999-val_loss=0.46.ckpt'
     DEVICE = 'cuda'
 
     # model = TransformerDenoisingModel()

@@ -22,12 +22,12 @@ if __name__ == "__main__":
 
     tb_logger = pl.loggers.TensorBoardLogger(".logs/")
     early_stop_callback = EarlyStopping(
-        monitor="val_loss", min_delta=0.0, patience=20, verbose=False, mode="min")
+        monitor="val_loss", min_delta=0.0, patience=200, verbose=False, mode="min")
 
     trainer = pl.Trainer(gpus=1, logger=tb_logger,
                          callbacks=[checkpoint_callback, early_stop_callback])
     trainer.fit(
         model=model,
-        train_dataloaders=dm.train_dataloader(),
-        val_dataloaders=dm.val_dataloader(),
+        train_dataloaders=dm.test_dataloader(),
+        val_dataloaders=dm.train_dataloader(),
     )

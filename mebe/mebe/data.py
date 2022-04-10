@@ -25,7 +25,7 @@ class SequencesDataset(torch.utils.data.Dataset):
             random.seed(1337)
             random.shuffle(self.data)
 
-        val_ratio = 0.15
+        val_ratio = 0.0
         train_val_split_pivot = int(len(self.data) * val_ratio)
 
         if mode == 'train':
